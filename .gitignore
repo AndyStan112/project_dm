@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 data
+
+# Local secrets
+.env
+
+# Local tooling
+.pytest_cache/
