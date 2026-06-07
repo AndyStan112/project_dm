@@ -1,7 +1,7 @@
 [project]
 name = "project-dm"
 version = "0.1.0"
-description = "Add your description here"
+description = "Collect and analyze eMAG product reviews."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -15,6 +15,19 @@ dependencies = [
     "tenacity>=9.1.4",
     "typer>=0.26.7",
 ]
+
+[project.scripts]
+project-dm = "project_dm.cli:main"
+emag-explore = "project_dm.commands.explore_emag:main"
+db-check-access = "project_dm.commands.check_db_access:main"
+db-configure-permissions = "project_dm.commands.configure_db_permissions:main"
+
+[build-system]
+requires = ["uv_build>=0.10.12,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
 
 [dependency-groups]
 dev = [

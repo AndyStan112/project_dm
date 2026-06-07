@@ -1,1 +1,0 @@
-"""eMAG review collection project."""

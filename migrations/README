@@ -10,7 +10,7 @@ Review the generated migration, then apply it with DATABASE_URL_ADMIN:
 
 After a migration creates a table, refresh restricted-role grants:
 
-    uv run python -m scripts.configure_db_permissions
+    uv run db-configure-permissions
 
 Application code must use DATABASE_URL_WRITE or DATABASE_URL_READ.
 Tables not represented in project_dm.models.Base are treated as unmanaged and
