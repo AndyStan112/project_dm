@@ -152,3 +152,25 @@ Dashboard pages use `DATABASE_URL_READ`. Brand creation, job controls, and
 worker desired-state updates use `DATABASE_URL_WRITE`. Worker buttons launch one
 bounded background task; the service controls manage the long-running worker
 daemons.
+
+## Docker Deployment
+
+The repository includes a `Dockerfile`, `compose.yml`, and GitHub Actions
+workflow for server deployment.
+
+The container exposes port `8000` and joins an external Docker network named
+`web`, so it can sit behind an existing reverse proxy without publishing host
+ports.
+
+On the server, create the external network once if it does not exist:
+
+```bash
+docker network create web
+```
+
+Then clone the repo into `~/apps/project_dm`, place your production `.env`
+there, and run:
+
+```bash
+docker compose up -d --build
+```

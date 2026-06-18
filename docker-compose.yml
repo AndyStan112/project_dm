@@ -1,0 +1,15 @@
+services:
+  project-dm:
+    build: .
+    container_name: project-dm-web
+    env_file:
+      - .env
+    expose:
+      - "8000"
+    networks:
+      - web
+    restart: unless-stopped
+
+networks:
+  web:
+    external: true

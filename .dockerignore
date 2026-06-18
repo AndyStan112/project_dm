@@ -1,0 +1,16 @@
+.git
+.github
+.agents
+.codex
+.venv
+.env
+.env.*
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite
+data
+dist
+.pytest_cache
+.mypy_cache
