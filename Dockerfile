@@ -22,10 +22,6 @@ COPY src ./src
 RUN uv sync --frozen --no-dev
 RUN uv run playwright install --with-deps chromium
 
-COPY migrations ./migrations
-COPY alembic.ini ./
-COPY scripts ./scripts
-
 EXPOSE 8000
 
 CMD ["uv", "run", "project-dm-web"]
