@@ -1,0 +1,18 @@
+{% set review = row.review %}
+<article class="review-card">
+  <div class="review-score"><strong>{{ review.rating }}</strong><span>/5</span></div>
+  <div class="review-main">
+    <div class="review-heading">
+      <div><span class="brand-pill">{{ row.brand_slug }}</span><strong>{{ review.title or "Untitled review" }}</strong></div>
+      <span class="badge {{ 'completed' if review.verified_purchase else 'paused' }}">{{ "verified" if review.verified_purchase else "unverified" }}</span>
+    </div>
+    <p>{{ review.content or "No written content." }}</p>
+    <div class="review-meta">
+      <span>{{ review.reviewer_name or "Anonymous" }}</span>
+      <span>{{ row.family_name }}</span>
+      <span>{{ review.storage or "unknown storage" }} · {{ review.color or "unknown color" }}</span>
+      <span>{{ review.votes }} helpful vote{{ "" if review.votes == 1 else "s" }}</span>
+      {% if review.published_at %}<span>{{ review.published_at.strftime("%d %b %Y") }}</span>{% endif %}
+    </div>
+  </div>
+</article>

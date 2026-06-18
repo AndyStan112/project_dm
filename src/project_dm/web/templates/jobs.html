@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Jobs · Project DM{% endblock %}
+{% block heading %}Collection jobs{% endblock %}
+{% block eyebrow %}Queue control{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/workers">Manage workers</a>
+  <form method="post" action="/workers/product/run"><button class="button secondary">Run product</button></form>
+  <form method="post" action="/workers/reviews/run"><button class="button">Run reviews</button></form>
+{% endblock %}
+{% block content %}
+<section class="panel filter-panel">
+  <form class="filter-form" method="get">
+    <label>Search<input name="q" value="{{ q }}" placeholder="Product, brand or URL"></label>
+    <label>Status<select name="status"><option value="">All statuses</option>{% for item in statuses %}<option value="{{ item }}" {{ "selected" if status == item else "" }}>{{ item }}</option>{% endfor %}</select></label>
+    <label>Type<select name="job_type"><option value="">All types</option>{% for item in ["brand_listing", "product", "reviews", "avatar", "nlp"] %}<option value="{{ item }}" {{ "selected" if job_type == item else "" }}>{{ item }}</option>{% endfor %}</select></label>
+    <button class="button" type="submit">Apply filters</button>
+    <a class="button ghost" href="/jobs">Reset</a>
+  </form>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><p class="eyebrow">Results</p><h2>{{ jobs|length }} jobs shown</h2></div><span class="panel-tag">Refresh to update</span></div>
+  {% include "_job_table.html" %}
+</section>
+{% endblock %}

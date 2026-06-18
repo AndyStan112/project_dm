@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Overview · Project DM{% endblock %}
+{% block heading %}Collection overview{% endblock %}
+{% block eyebrow %}Current dataset{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/reviews">Explore reviews</a>
+  <a class="button" href="/jobs">Open queue</a>
+  {% if live %}
+  <a class="button secondary" href="/">Live refresh: On</a>
+  {% else %}
+  <a class="button secondary" href="/?live=1">Live refresh: Off</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<section class="metric-grid">
+  <article class="metric hero-metric">
+    <span>Reviews collected</span>
+    <strong id="metric-reviews">{{ "{:,}".format(stats.reviews) }}</strong>
+    <small id="metric-reviews-detail">{{ stats.verified_reviews }} verified · {{ stats.helpful_reviews }} with votes</small>
+  </article>
+  <article class="metric">
+    <span>Product families</span>
+    <strong id="metric-families">{{ stats.families }}</strong>
+    <small id="metric-families-detail">{{ stats.variants }} known variants</small>
+  </article>
+  <article class="metric">
+    <span>Active queue</span>
+    <strong id="metric-queue">{{ stats.pending_jobs }}</strong>
+    <small>pending, running or paused</small>
+  </article>
+  <article class="metric">
+    <span>Scraper lanes</span>
+    <strong>{{ scraper_lane_count }}</strong>
+    <small>parallel lanes behind the scraper service</small>
+  </article>
+  <article class="metric alert-metric">
+    <span>Needs attention</span>
+    <strong id="metric-blocked">{{ stats.blocked_jobs }}</strong>
+    <small>blocked or failed jobs</small>
+  </article>
+</section>
+
+<section class="two-column">
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Distribution</p><h2>Review ratings</h2></div>
+      <span class="panel-tag" id="rating-total">{{ stats.reviews }} total</span>
+    </div>
+    <div class="bar-chart" id="rating-chart">
+      {% set max_rating_count = rating_counts | map(attribute=1) | max if rating_counts else 1 %}
+      {% for rating, count in rating_counts %}
+      <div class="bar-row" data-rating="{{ rating }}">
+        <span>{{ rating }} stars</span>
+        <div class="bar-track"><i style="width: {{ (count / max_rating_count * 100) if max_rating_count else 0 }}%"></i></div>
+        <strong>{{ count }}</strong>
+      </div>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Queue health</p><h2>Jobs by status</h2></div>
+      <a class="text-link" href="/jobs">View all</a>
+    </div>
+    <div class="status-grid" id="job-status-grid">
+      {% for status, count in job_counts %}
+      <a href="/jobs?status={{ status }}" class="status-tile" data-status="{{ status }}">
+        <span class="status-dot {{ status }}"></span>
+        <strong>{{ count }}</strong>
+        <small>{{ status }}</small>
+      </a>
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Service state</p><h2>Workers</h2></div>
+    <a class="text-link" href="/workers">Manage workers</a>
+  </div>
+  <div class="status-grid workers-grid" id="workers-summary">
+    <a href="/workers" class="status-tile">
+      <span class="status-dot running"></span>
+      <strong>3</strong>
+      <small>managed services</small>
+    </a>
+    <a href="/workers" class="status-tile">
+      <span class="status-dot paused"></span>
+      <strong>UI</strong>
+      <small>desired-state control</small>
+    </a>
+    <a href="/workers" class="status-tile">
+      <span class="status-dot blocked"></span>
+      <strong>Live</strong>
+      <small>current status and heartbeats</small>
+    </a>
+  </div>
+  <p class="hint">`project-dm-web` now starts the worker supervisors in-process, including {{ scraper_lane_count }} scraper lanes. If heartbeats stay at <code>never</code>, the web app is running without that supervisor loop.</p>
+</section>
+
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Live activity</p><h2>Recently updated jobs</h2></div>
+    <a class="text-link" href="/jobs">Manage queue</a>
+  </div>
+  <div id="dashboard-jobs">{% include "_job_table.html" with context %}</div>
+</section>
+
+<section class="two-column bottom-row">
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Add source</p><h2>Collect another brand</h2></div>
+    </div>
+    <form class="inline-form" method="post" action="/brands">
+      <label>
+        Brand slug or eMAG URL
+        <input name="brand" required placeholder="samsung">
+      </label>
+      <button class="button" type="submit">Create listing job</button>
+    </form>
+  </article>
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Worker queue</p><h2>Open management</h2></div>
+    </div>
+    <p class="hint">Use the Workers page to manage desired state, review heartbeats, and trigger bounded runs.</p>
+    <a class="button secondary" href="/workers">Go to workers</a>
+  </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const liveEnabled = {{ 'true' if live else 'false' }};
+  if (!liveEnabled) return;
+
+  const endpoint = "/api/dashboard";
+  const metrics = {
+    reviews: document.getElementById("metric-reviews"),
+    reviewsDetail: document.getElementById("metric-reviews-detail"),
+    families: document.getElementById("metric-families"),
+    familiesDetail: document.getElementById("metric-families-detail"),
+    queue: document.getElementById("metric-queue"),
+    blocked: document.getElementById("metric-blocked"),
+    ratingTotal: document.getElementById("rating-total"),
+    ratingChart: document.getElementById("rating-chart"),
+    jobGrid: document.getElementById("job-status-grid"),
+    jobs: document.getElementById("dashboard-jobs"),
+  };
+
+  const formatInt = (value) => new Intl.NumberFormat("en-US").format(value);
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[ch]);
+
+  const renderRatings = (ratingCounts) => {
+    if (!metrics.ratingChart) return;
+    const maxCount = ratingCounts.reduce(
+      (max, row) => Math.max(max, row.count),
+      1,
+    );
+    metrics.ratingChart.innerHTML = ratingCounts.map((row) => `
+      <div class="bar-row" data-rating="${escapeHtml(row.rating)}">
+        <span>${escapeHtml(row.rating)} stars</span>
+        <div class="bar-track"><i style="width: ${maxCount ? (row.count / maxCount * 100) : 0}%"></i></div>
+        <strong>${escapeHtml(row.count)}</strong>
+      </div>
+    `).join("");
+  };
+
+  const renderJobStatus = (jobCounts) => {
+    if (!metrics.jobGrid) return;
+    metrics.jobGrid.innerHTML = jobCounts.map((row) => `
+      <a href="/jobs?status=${encodeURIComponent(row.status)}" class="status-tile" data-status="${escapeHtml(row.status)}">
+        <span class="status-dot ${escapeHtml(row.status)}"></span>
+        <strong>${escapeHtml(row.count)}</strong>
+        <small>${escapeHtml(row.status)}</small>
+      </a>
+    `).join("");
+  };
+
+  const renderRecentJobs = (jobs) => {
+    if (!metrics.jobs) return;
+    if (!jobs.length) {
+      metrics.jobs.innerHTML = '<div class="empty-state">No jobs found.</div>';
+      return;
+    }
+    const rows = jobs.map((job) => {
+      const total = job.total_expected || 0;
+      const percent = total ? Math.min(100, (job.current_offset / total) * 100) : 0;
+      const target = job.family_name || job.brand_slug || "Unassigned";
+      const title = job.target_url || "No target URL";
+      const extra = job.total_expected !== null && job.total_expected !== undefined ? ` / ${job.total_expected}` : "";
+      const errorRow = job.last_error
+        ? `<tr class="error-row"><td></td><td colspan="5">${escapeHtml(job.last_error)}</td></tr>`
+        : "";
+      return `
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Job</th><th>Target</th><th>Status</th><th>Progress</th><th>Attempts</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>#${escapeHtml(job.id)}</strong><small>${escapeHtml(job.job_type)}</small></td>
+                <td class="target-cell"><strong>${escapeHtml(target)}</strong><small title="${escapeHtml(title)}">${escapeHtml(title)}</small></td>
+                <td><span class="badge ${escapeHtml(job.status)}">${escapeHtml(job.status)}</span></td>
+                <td><div class="progress"><i style="width: ${percent}%"></i></div><small>${escapeHtml(job.current_offset)}${escapeHtml(extra)}</small></td>
+                <td>${escapeHtml(job.attempts)}</td>
+                <td><a class="text-link" href="/jobs">Manage</a></td>
+              </tr>
+              ${errorRow}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }).join("");
+    metrics.jobs.innerHTML = rows;
+  };
+
+  const refresh = async () => {
+    try {
+      const response = await fetch(endpoint, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      metrics.reviews.textContent = formatInt(data.stats.reviews);
+      metrics.reviewsDetail.textContent = `${formatInt(data.stats.verified_reviews)} verified · ${formatInt(data.stats.helpful_reviews)} with votes`;
+      metrics.families.textContent = formatInt(data.stats.families);
+      metrics.familiesDetail.textContent = `${formatInt(data.stats.variants)} known variants`;
+      metrics.queue.textContent = formatInt(data.stats.pending_jobs);
+      metrics.blocked.textContent = formatInt(data.stats.blocked_jobs);
+      metrics.ratingTotal.textContent = `${formatInt(data.stats.reviews)} total`;
+      renderRatings(data.rating_counts);
+      renderJobStatus(data.job_counts);
+      renderRecentJobs(data.recent_jobs);
+    } catch (error) {
+      console.error("Dashboard refresh failed", error);
+    }
+  };
+
+  refresh();
+  setInterval(refresh, 1000);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% set family = product.family %}
+{% block title %}{{ family.name }} · Project DM{% endblock %}
+{% block heading %}{{ family.name }}{% endblock %}
+{% block eyebrow %}{{ product.brand_slug }} · family {{ family.emag_family_id }}{% endblock %}
+{% block actions %}<a class="button secondary" href="{{ family.url }}" target="_blank" rel="noreferrer">Open on eMAG</a><a class="button" href="/reviews?q={{ family.name | urlencode }}">Search reviews</a>{% endblock %}
+{% block content %}
+<section class="detail-grid">
+  <article class="panel">
+    <div class="panel-heading"><div><p class="eyebrow">Product data</p><h2>Summary</h2></div><span class="rating large">★ {{ family.aggregate_rating or "–" }}</span></div>
+    <p class="description">{{ family.description or "No description collected." }}</p>
+    <div class="product-facts wide">
+      <div><strong>{{ product.variants|length }}</strong><small>variants</small></div>
+      <div><strong>{{ family.review_count or 0 }}</strong><small>eMAG reviews</small></div>
+      <div><strong>{{ reviews|length }}</strong><small>shown below</small></div>
+    </div>
+  </article>
+  <article class="panel">
+    <div class="panel-heading"><div><p class="eyebrow">Distribution</p><h2>Ratings</h2></div></div>
+    {% set maximum = product.rating_counts | map(attribute=1) | max if product.rating_counts else 1 %}
+    <div class="bar-chart">{% for rating, count in product.rating_counts %}<div class="bar-row"><span>{{ rating }} stars</span><div class="bar-track"><i style="width: {{ (count / maximum * 100) if maximum else 0 }}%"></i></div><strong>{{ count }}</strong></div>{% endfor %}</div>
+  </article>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><p class="eyebrow">SKUs</p><h2>Known variants</h2></div></div>
+  <div class="table-wrap"><table><thead><tr><th>PNK</th><th>Storage</th><th>Color</th><th>Price</th><th>Available</th></tr></thead><tbody>{% for variant in product.variants %}<tr><td><a class="text-link" href="{{ variant.url }}" target="_blank">{{ variant.pnk }}</a></td><td>{{ variant.storage or "–" }}</td><td>{{ variant.color or "–" }}</td><td>{{ "{:,.2f}".format(variant.price) if variant.price else "–" }} {{ variant.currency or "" }}</td><td><span class="badge {{ 'completed' if variant.available else 'paused' }}">{{ "yes" if variant.available else "no" }}</span></td></tr>{% endfor %}</tbody></table></div>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><p class="eyebrow">Sample</p><h2>Latest collected reviews</h2></div><a class="text-link" href="/reviews?q={{ family.name | urlencode }}">See matching reviews</a></div>
+  <div class="review-list">{% for row in reviews %}{% include "_review_card.html" %}{% else %}<div class="empty-state">No reviews collected for this family yet.</div>{% endfor %}</div>
+</section>
+{% endblock %}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Project DM{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand-mark" href="/">
+        <span class="brand-icon">DM</span>
+        <span>
+          <strong>Project DM</strong>
+          <small>eMAG research console</small>
+        </span>
+      </a>
+      <nav>
+        <a class="{{ 'active' if active == 'dashboard' else '' }}" href="/">
+          <span>Overview</span><kbd>01</kbd>
+        </a>
+        <a class="{{ 'active' if active == 'jobs' else '' }}" href="/jobs">
+          <span>Collection jobs</span><kbd>02</kbd>
+        </a>
+        <a class="{{ 'active' if active == 'workers' else '' }}" href="/workers">
+          <span>Workers</span><kbd>03</kbd>
+        </a>
+        <a class="{{ 'active' if active == 'products' else '' }}" href="/products">
+          <span>Products</span><kbd>04</kbd>
+        </a>
+        <a class="{{ 'active' if active == 'reviews' else '' }}" href="/reviews">
+          <span>Reviews</span><kbd>05</kbd>
+        </a>
+      </nav>
+      <div class="sidebar-note">
+        <span class="pulse"></span>
+        <div>
+          <strong>Role separated</strong>
+          <small>Reads and controls use distinct database credentials.</small>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">{% block eyebrow %}Research workspace{% endblock %}</p>
+          <h1>{% block heading %}Dashboard{% endblock %}</h1>
+        </div>
+        <div class="topbar-actions">{% block actions %}{% endblock %}</div>
+      </header>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

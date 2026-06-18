@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Reviews · Project DM{% endblock %}
+{% block heading %}Review explorer{% endblock %}
+{% block eyebrow %}Search and inspect{% endblock %}
+{% block content %}
+<section class="metric-grid compact">
+  <article class="metric hero-metric"><span>Collected</span><strong>{{ summary.count }}</strong><small>review records</small></article>
+  <article class="metric"><span>Average rating</span><strong>{{ "{:.2f}".format(summary.average_rating) }}</strong><small>out of five</small></article>
+  <article class="metric"><span>Verified</span><strong>{{ summary.verified }}</strong><small>purchased through eMAG</small></article>
+  <article class="metric"><span>Helpful</span><strong>{{ summary.helpful }}</strong><small>at least one vote</small></article>
+</section>
+<section class="panel filter-panel">
+  <form class="filter-form review-filters" method="get">
+    <label>Text query<input name="q" value="{{ q }}" placeholder="battery, camera, reviewer..."></label>
+    <label>Rating<select name="rating"><option value="">Any rating</option>{% for item in [5,4,3,2,1] %}<option value="{{ item }}" {{ "selected" if rating == item else "" }}>{{ item }} stars</option>{% endfor %}</select></label>
+    <label>Purchase<select name="verified"><option value="">Any</option><option value="yes" {{ "selected" if verified == "yes" else "" }}>Verified</option><option value="no" {{ "selected" if verified == "no" else "" }}>Unverified</option></select></label>
+    <label>Votes<select name="helpful"><option value="">Any</option><option value="yes" {{ "selected" if helpful == "yes" else "" }}>Has votes</option><option value="no" {{ "selected" if helpful == "no" else "" }}>No votes</option></select></label>
+    <button class="button" type="submit">Query dataset</button><a class="button ghost" href="/reviews">Reset</a>
+  </form>
+</section>
+<section class="two-column review-layout">
+  <article class="panel ratings-side">
+    <div class="panel-heading"><div><p class="eyebrow">All reviews</p><h2>Rating mix</h2></div></div>
+    {% set maximum = rating_counts | map(attribute=1) | max if rating_counts else 1 %}
+    <div class="bar-chart">{% for score, count in rating_counts %}<a class="bar-row" href="/reviews?rating={{ score }}"><span>{{ score }} stars</span><div class="bar-track"><i style="width: {{ (count / maximum * 100) if maximum else 0 }}%"></i></div><strong>{{ count }}</strong></a>{% endfor %}</div>
+  </article>
+  <article>
+    <div class="results-heading"><strong>{{ reviews|length }} results shown</strong><small>Newest first, capped at 100</small></div>
+    <div class="review-list">{% for row in reviews %}{% include "_review_card.html" %}{% else %}<div class="empty-state">No reviews match this query.</div>{% endfor %}</div>
+  </article>
+</section>
+{% endblock %}

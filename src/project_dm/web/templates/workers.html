@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Workers · Project DM{% endblock %}
+{% block heading %}Worker controls{% endblock %}
+{% block eyebrow %}Service management{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/jobs">Open queue</a>
+{% endblock %}
+{% block content %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Important</p><h2>What this page can and cannot do</h2></div>
+    <span class="panel-tag">{{ "daemon online" if worker_daemon_online else "no daemon" }}</span>
+  </div>
+  <p class="hint">
+    This dashboard stores <strong>desired state</strong> for worker services.
+    The web app now runs a supervisor loop in-process, and the scraper service
+    uses {{ scraper_lane_count }} parallel lanes, so the table should move from
+    <code>stopped</code> and <code>never</code> to live heartbeat updates after
+    startup.
+  </p>
+  {% if queued_reviews is not none %}
+  <p class="hint">Queued or resumed {{ queued_reviews }} review jobs for families that still have reviews left to collect.</p>
+  {% endif %}
+</section>
+
+<section class="two-column">
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Desired state</p><h2>Background services</h2></div>
+      <span class="panel-tag">UI managed</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Worker</th>
+            <th>Desired</th>
+            <th>Current</th>
+            <th>Job</th>
+            <th>Heartbeat</th>
+            <th>Message</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for control in controls %}
+          <tr>
+            <td><strong>{{ control.service_name }}</strong></td>
+            <td><span class="badge {{ control.desired_state }}">{{ control.desired_state }}</span></td>
+            <td><span class="badge {{ control.current_state }}">{{ control.current_state }}</span></td>
+            <td><small>{{ control.current_job_id or "idle" }}</small></td>
+            <td>
+              <small>{{ control.last_heartbeat_at or "never" }}</small>
+            </td>
+            <td class="target-cell">
+              <small title="{{ control.message or '' }}">{{ control.message or "No message" }}</small>
+            </td>
+            <td class="row-actions">
+              <form method="post" action="/service-controls/{{ control.service_name }}/start"><button>Start</button></form>
+              <form method="post" action="/service-controls/{{ control.service_name }}/pause"><button>Pause</button></form>
+              <form method="post" action="/service-controls/{{ control.service_name }}/stop"><button class="danger-link">Stop</button></form>
+            </td>
+          </tr>
+          <tr class="error-row">
+            <td></td>
+            <td colspan="5">{{ control.status_note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">Desired state is what the UI asks for. Current state and heartbeat come from the in-process supervisor loop.</p>
+  </article>
+
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Bounded execution</p><h2>Run one unit</h2></div>
+    </div>
+    <div class="worker-buttons">
+      <form method="post" action="/workers/listing/run"><button class="button secondary">Listing page</button></form>
+      <form method="post" action="/workers/product/run"><button class="button secondary">Product page</button></form>
+      <form method="post" action="/workers/reviews/run" class="inline-form">
+        <label>
+          Review page size
+          <input name="page_size" type="number" min="1" max="100" value="{{ review_page_size }}">
+        </label>
+        <label>
+          Pages per click
+          <input name="max_pages" type="number" min="1" value="{{ review_max_pages }}">
+        </label>
+        <button class="button secondary" type="submit">Review page</button>
+      </form>
+      <form method="post" action="/workers/reviews/queue-missing"><button class="button">Continue review backlog</button></form>
+    </div>
+    <p class="hint">Review runs now use the values you set here. The scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>
+  </article>
+</section>
+{% endblock %}
