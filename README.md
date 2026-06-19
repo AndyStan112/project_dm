@@ -178,3 +178,7 @@ docker compose up -d --build
 For human-assisted CAPTCHA solving, open the `Open browser` button in the UI.
 That points at the container's noVNC session, which shows the Chromium window
 that the review worker is using when `PROJECT_DM_ATTENDED_BROWSER=1`.
+Set `PROJECT_DM_BROWSER_PUBLIC_URL` in `.env` to the HTTPS browser hostname
+that your proxy serves, for example `https://vnc.windogs.win`.
+If you change the browser host, update the reverse proxy to point that hostname
+at the container's `6080` port.

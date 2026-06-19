@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import sys
 import json
+import os
 from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
@@ -60,6 +61,7 @@ from project_dm.scraping.reviews import build_reviews_url
 PACKAGE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 DIAGNOSTICS_DIR = Path("data") / "diagnostics"
+DEFAULT_BROWSER_PUBLIC_URL = "https://vnc.windogs.win"
 
 app = FastAPI(title="Project DM Dashboard")
 app.mount(
@@ -139,6 +141,13 @@ def _as_bool(value: str | None) -> bool:
 
 def _diagnostic_directory(job_id: int) -> Path:
     return DIAGNOSTICS_DIR / f"job_{job_id}"
+
+
+def _browser_public_url() -> str:
+    value = os.getenv("PROJECT_DM_BROWSER_PUBLIC_URL")
+    if value:
+        return value.rstrip("/")
+    return DEFAULT_BROWSER_PUBLIC_URL
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -326,9 +335,8 @@ def job_diagnostics(job_id: int) -> JSONResponse:
 
 @app.get("/browser")
 def browser_session(request: Request) -> RedirectResponse:
-    host = request.url.hostname or "127.0.0.1"
     return RedirectResponse(
-        f"http://{host}:6080/vnc.html?autoconnect=true&resize=remote",
+        f"{_browser_public_url()}/vnc.html?autoconnect=true&resize=remote",
         status_code=303,
     )
 
