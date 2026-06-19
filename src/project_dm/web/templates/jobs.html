@@ -11,6 +11,12 @@
     <input type="hidden" name="fetch_all" value="1">
     <button class="button secondary" type="submit">Run all reviews</button>
   </form>
+  <form method="post" action="/workers/reviews/run" class="inline-form">
+    <input type="hidden" name="page_size" value="0">
+    <input type="hidden" name="fetch_all" value="1">
+    <input type="hidden" name="attended_browser" value="1">
+    <button class="button" type="submit">Run all reviews in browser</button>
+  </form>
 {% endblock %}
 {% block content %}
 <section class="panel filter-panel">

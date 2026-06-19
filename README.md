@@ -158,9 +158,9 @@ daemons.
 The repository includes a `Dockerfile`, `compose.yml`, and GitHub Actions
 workflow for server deployment.
 
-The container exposes port `8000` and joins an external Docker network named
-`web`, so it can sit behind an existing reverse proxy without publishing host
-ports.
+The container exposes ports `8000` for the web app and `6080` for the remote
+browser session, and joins an external Docker network named `web`, so it can
+sit behind an existing reverse proxy without publishing host ports.
 
 On the server, create the external network once if it does not exist:
 
@@ -174,3 +174,7 @@ there, and run:
 ```bash
 docker compose up -d --build
 ```
+
+For human-assisted CAPTCHA solving, open the `Open browser` button in the UI.
+That points at the container's noVNC session, which shows the Chromium window
+that the review worker is using when `PROJECT_DM_ATTENDED_BROWSER=1`.

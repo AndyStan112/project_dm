@@ -39,6 +39,7 @@
         <p>{{ job.last_error or "No error message recorded." }}</p>
       </div>
       <div class="blocked-actions">
+        <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
         {% if job.target_url %}
         <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
         {% endif %}
@@ -121,7 +122,17 @@
           <input name="fetch_all" type="checkbox" value="1">
           Fetch all reviews at once
         </label>
+        <label class="checkbox-label">
+          <input name="attended_browser" type="checkbox" value="1">
+          Use remote browser
+        </label>
         <button class="button secondary" type="submit">Review page</button>
+      </form>
+      <form method="post" action="/workers/reviews/run" class="inline-form">
+        <input type="hidden" name="page_size" value="0">
+        <input type="hidden" name="fetch_all" value="1">
+        <input type="hidden" name="attended_browser" value="1">
+        <button class="button" type="submit">Review in browser</button>
       </form>
       <form method="post" action="/workers/reviews/queue-missing"><button class="button">Continue review backlog</button></form>
     </div>

@@ -4,8 +4,12 @@ services:
     container_name: project-dm-web
     env_file:
       - .env
+    environment:
+      PROJECT_DM_ATTENDED_BROWSER: "1"
     expose:
       - "8000"
+      - "5900"
+      - "6080"
     networks:
       - web
     restart: unless-stopped

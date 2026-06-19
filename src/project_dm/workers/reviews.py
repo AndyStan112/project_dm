@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import sys
 import time
@@ -89,6 +90,15 @@ def _response_error_message(
     )
 
 
+def _attended_browser_mode() -> bool:
+    return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def apply_review_payload(
     session,
     *,
@@ -129,10 +139,13 @@ def run_one_review_job(
     page_size: int = 10,
     min_delay: float = 5.0,
     max_delay: float = 10.0,
+    attended_browser: bool | None = None,
 ) -> ReviewRunResult:
+    if attended_browser is None:
+        attended_browser = _attended_browser_mode()
     print(
         "[reviews] enter run_one_review_job "
-        f"module={__file__} max_pages={max_pages} page_size={page_size}",
+        f"module={__file__} max_pages={max_pages} page_size={page_size} attended={attended_browser}",
         file=sys.stderr,
         flush=True,
     )
@@ -224,7 +237,7 @@ def run_one_review_job(
     playwright = None
     browser = None
     try:
-        playwright, browser = open_browser()
+        playwright, browser = open_browser(attended_browser=attended_browser)
         context = browser.new_context(
             locale="ro-RO",
             timezone_id="Europe/Bucharest",
@@ -283,85 +296,164 @@ def run_one_review_job(
             reviews_url = build_reviews_url(
                 target_url, offset=offset, limit=effective_page_size
             )
-            response = context.request.get(reviews_url, timeout=60_000)
-            response_body = response.text()
-            print(
-                "[reviews] response "
-                f"job_id={job_id} offset={offset} url={reviews_url} "
-                f"status={response.status} content_type={response.headers.get('content-type')}",
-                file=sys.stderr,
-                flush=True,
-            )
-            if response.status in {403, 405, 429}:
-                message = _response_error_message(
-                    url=reviews_url,
-                    status=response.status,
-                    content_type=response.headers.get("content-type"),
-                    body=response_body,
+            if _attended_browser_mode():
+                response = page.goto(
+                    reviews_url,
+                    wait_until="domcontentloaded",
+                    timeout=60_000,
                 )
-                _save_response_diagnostic(
-                    job_id=job_id,
-                    label="blocked_review_request",
-                    url=reviews_url,
-                    status=response.status,
-                    headers=dict(response.headers),
-                    body=response_body,
-                )
-                with write_session() as session, session.begin():
-                    fail_job(
-                        session,
-                        job_id=job_id,
-                        status=JobStatus.BLOCKED,
-                        message=message,
-                    )
-                return ReviewRunResult(
-                    job_id=job_id,
-                    pages_processed=pages_processed,
-                    reviews_upserted=reviews_upserted,
-                    status=JobStatus.BLOCKED,
-                    message=message,
-                )
-            if not response.ok:
+                page.wait_for_timeout(1_500)
+                response_body = page.locator("body").inner_text(timeout=5_000)
                 print(
-                    "[reviews] non-ok response "
-                    f"job_id={job_id} offset={offset} "
-                    f"status={response.status} "
-                    f"url={reviews_url} "
-                    f"headers={dict(response.headers)} "
-                    f"body={response_body}",
+                    "[reviews] attended page response "
+                    f"job_id={job_id} offset={offset} url={reviews_url} "
+                    f"status={response.status if response is not None else None} "
+                    f"content_type={response.headers.get('content-type') if response is not None else None}",
                     file=sys.stderr,
                     flush=True,
                 )
-                message = _response_error_message(
-                    url=reviews_url,
-                    status=response.status,
-                    content_type=response.headers.get("content-type"),
-                    body=response_body,
-                )
-                _save_response_diagnostic(
-                    job_id=job_id,
-                    label="invalid_review_response",
-                    url=reviews_url,
-                    status=response.status,
-                    headers=dict(response.headers),
-                    body=response_body,
-                )
-                with write_session() as session, session.begin():
-                    fail_job(
-                        session,
+                if response is not None and response.status in {403, 405, 429}:
+                    _save_response_diagnostic(
                         job_id=job_id,
+                        label="blocked_review_request",
+                        url=reviews_url,
+                        status=response.status,
+                        headers=dict(response.headers),
+                        body=response_body,
+                    )
+                    with write_session() as session, session.begin():
+                        fail_job(
+                            session,
+                            job_id=job_id,
+                            status=JobStatus.BLOCKED,
+                            message=_response_error_message(
+                                url=reviews_url,
+                                status=response.status,
+                                content_type=response.headers.get(
+                                    "content-type"
+                                ),
+                            body=response_body,
+                        ),
+                    )
+                    print(
+                        "[reviews] waiting for manual captcha solve "
+                        f"job_id={job_id} url={reviews_url}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    with write_session() as session, session.begin():
+                        set_job_status(session, job_id, JobStatus.RUNNING)
+                        update_service_control_state(
+                            session,
+                            "scraper",
+                            current_state=JobStatus.RUNNING.value,
+                            current_job_id=job_id,
+                            message=(
+                                f"Awaiting manual CAPTCHA solve for job #{job_id}."
+                            ),
+                        )
+                    page.bring_to_front()
+                    while True:
+                        if current_status(job_id) is not JobStatus.RUNNING:
+                            return ReviewRunResult(
+                                job_id=job_id,
+                                pages_processed=pages_processed,
+                                reviews_upserted=reviews_upserted,
+                                status=JobStatus.PAUSED,
+                                message="Stopped while waiting for manual solve.",
+                            )
+                        page.wait_for_timeout(2_000)
+                        response_body = page.locator("body").inner_text(
+                            timeout=5_000
+                        )
+                        if response_body.lstrip().startswith("{"):
+                            break
+                    response = None
+                if not response_body.lstrip().startswith("{"):
+                    body_text = response_body
+                    payload = json.loads(body_text)
+                else:
+                    payload = json.loads(response_body)
+            else:
+                response = context.request.get(reviews_url, timeout=60_000)
+                response_body = response.text()
+                print(
+                    "[reviews] response "
+                    f"job_id={job_id} offset={offset} url={reviews_url} "
+                    f"status={response.status} content_type={response.headers.get('content-type')}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                if response.status in {403, 405, 429}:
+                    message = _response_error_message(
+                        url=reviews_url,
+                        status=response.status,
+                        content_type=response.headers.get("content-type"),
+                        body=response_body,
+                    )
+                    _save_response_diagnostic(
+                        job_id=job_id,
+                        label="blocked_review_request",
+                        url=reviews_url,
+                        status=response.status,
+                        headers=dict(response.headers),
+                        body=response_body,
+                    )
+                    with write_session() as session, session.begin():
+                        fail_job(
+                            session,
+                            job_id=job_id,
+                            status=JobStatus.BLOCKED,
+                            message=message,
+                        )
+                    return ReviewRunResult(
+                        job_id=job_id,
+                        pages_processed=pages_processed,
+                        reviews_upserted=reviews_upserted,
+                        status=JobStatus.BLOCKED,
+                        message=message,
+                    )
+                if not response.ok:
+                    print(
+                        "[reviews] non-ok response "
+                        f"job_id={job_id} offset={offset} "
+                        f"status={response.status} "
+                        f"url={reviews_url} "
+                        f"headers={dict(response.headers)} "
+                        f"body={response_body}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    message = _response_error_message(
+                        url=reviews_url,
+                        status=response.status,
+                        content_type=response.headers.get("content-type"),
+                        body=response_body,
+                    )
+                    _save_response_diagnostic(
+                        job_id=job_id,
+                        label="invalid_review_response",
+                        url=reviews_url,
+                        status=response.status,
+                        headers=dict(response.headers),
+                        body=response_body,
+                    )
+                    with write_session() as session, session.begin():
+                        fail_job(
+                            session,
+                            job_id=job_id,
+                            status=JobStatus.FAILED,
+                            message=message,
+                        )
+                    return ReviewRunResult(
+                        job_id=job_id,
+                        pages_processed=pages_processed,
+                        reviews_upserted=reviews_upserted,
                         status=JobStatus.FAILED,
                         message=message,
                     )
-                return ReviewRunResult(
-                    job_id=job_id,
-                    pages_processed=pages_processed,
-                    reviews_upserted=reviews_upserted,
-                    status=JobStatus.FAILED,
-                    message=message,
-                )
 
-            payload = json.loads(response_body)
+                payload = json.loads(response_body)
             with write_session() as session, session.begin():
                 reviews_seen, offset, checkpoint_status = (
                     apply_review_payload(

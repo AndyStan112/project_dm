@@ -56,6 +56,7 @@
           <p>{{ job.last_error or "No error message recorded." }}</p>
         </div>
         <div class="blocked-actions">
+          <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
           {% if job.target_url %}
           <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
           {% endif %}
@@ -235,6 +236,8 @@
           <p>${escapeHtml(job.last_error || "No error message recorded.")}</p>
         </div>
         <div class="blocked-actions">
+          <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+          <a class="button" href="/jobs/${encodeURIComponent(job.id)}/solve">Solve captcha</a>
           ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}" target="_blank" rel="noreferrer">Open target</a>` : ""}
           <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>
           <form method="post" action="/jobs/${encodeURIComponent(job.id)}/resume"><button type="submit">Resume</button></form>

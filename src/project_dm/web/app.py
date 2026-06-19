@@ -8,7 +8,7 @@ from typing import Annotated
 from dataclasses import asdict
 
 import uvicorn
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import Body, FastAPI, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -324,6 +324,15 @@ def job_diagnostics(job_id: int) -> JSONResponse:
     return JSONResponse({"job_id": job_id, "files": files})
 
 
+@app.get("/browser")
+def browser_session(request: Request) -> RedirectResponse:
+    host = request.url.hostname or "127.0.0.1"
+    return RedirectResponse(
+        f"http://{host}:6080/vnc.html?autoconnect=true&resize=remote",
+        status_code=303,
+    )
+
+
 @app.get("/jobs/{job_id}/solve", response_class=HTMLResponse)
 def solve_job(request: Request, job_id: int) -> HTMLResponse:
     with read_session() as session:
@@ -358,7 +367,10 @@ def solve_job(request: Request, job_id: int) -> HTMLResponse:
 
 
 @app.post("/jobs/{job_id}/solve")
-def submit_solved_review(job_id: int, payload: dict[str, object]) -> RedirectResponse:
+def submit_solved_review(
+    job_id: int,
+    payload: dict[str, object] = Body(...),
+) -> RedirectResponse:
     with write_session() as session, session.begin():
         job = session.get(Job, job_id, with_for_update=True)
         if job is None:
@@ -411,6 +423,7 @@ def _run_worker(
     max_pages: int | None = 1,
     page_size: int = 10,
     fetch_all: bool = False,
+    attended_browser: bool = False,
 ) -> None:
     if worker == "listing":
         run_one_listing_job(max_pages=max_pages)
@@ -420,6 +433,7 @@ def _run_worker(
         run_one_review_job(
             max_pages=max_pages,
             page_size=0 if fetch_all else page_size,
+            attended_browser=attended_browser,
         )
 
 
@@ -429,10 +443,11 @@ def run_worker(
     max_pages: Annotated[int | None, Form()] = 1,
     page_size: Annotated[int, Form()] = 10,
     fetch_all: Annotated[bool, Form()] = False,
+    attended_browser: Annotated[bool, Form()] = False,
 ) -> RedirectResponse:
     print(
         "[web] run_worker "
-        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size} fetch_all={fetch_all}",
+        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size} fetch_all={fetch_all} attended_browser={attended_browser}",
         file=sys.stderr,
         flush=True,
     )
@@ -449,6 +464,7 @@ def run_worker(
             "max_pages": max_pages,
             "page_size": page_size,
             "fetch_all": fetch_all,
+            "attended_browser": attended_browser,
         },
         daemon=True,
         name=f"project-dm-{worker}-run",

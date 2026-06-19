@@ -26,6 +26,7 @@
           {% if job.job_type == "reviews" %}
           <a class="text-link" href="/jobs/{{ job.id }}/solve">Solve captcha</a>
           {% endif %}
+          <a class="text-link" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
           {% elif job.status == "pending" %}
           <form method="post" action="/jobs/{{ job.id }}/pause"><button>Pause</button></form>
           <form method="post" action="/jobs/{{ job.id }}/promote"><button>Promote</button></form>

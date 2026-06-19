@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 import time
 from dataclasses import dataclass
@@ -51,9 +52,23 @@ def save_diagnostic(page: Page, job_id: int, label: str) -> None:
     page.screenshot(path=directory / f"{label}.png", full_page=True)
 
 
-def open_browser() -> tuple[object, Browser]:
+def open_browser(
+    *, attended_browser: bool | None = None
+) -> tuple[object, Browser]:
     playwright = sync_playwright().start()
-    browser = playwright.chromium.launch(headless=True)
+    if attended_browser is None:
+        attended = os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+    else:
+        attended = attended_browser
+    browser = playwright.chromium.launch(
+        headless=not attended,
+        slow_mo=50 if attended else 0,
+    )
     return playwright, browser
 
 
