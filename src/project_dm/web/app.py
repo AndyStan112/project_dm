@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
 
 import uvicorn
-from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -291,7 +292,6 @@ def _run_worker(
 @app.post("/workers/{worker}/run")
 def run_worker(
     worker: str,
-    background_tasks: BackgroundTasks,
     max_pages: Annotated[int | None, Form()] = 1,
     page_size: Annotated[int, Form()] = 10,
 ) -> RedirectResponse:
@@ -301,12 +301,16 @@ def run_worker(
         raise HTTPException(status_code=422, detail="max_pages must be positive")
     if page_size < 1:
         raise HTTPException(status_code=422, detail="page_size must be positive")
-    background_tasks.add_task(
-        _run_worker,
-        worker,
-        max_pages=max_pages,
-        page_size=page_size,
-    )
+    threading.Thread(
+        target=_run_worker,
+        kwargs={
+            "worker": worker,
+            "max_pages": max_pages,
+            "page_size": page_size,
+        },
+        daemon=True,
+        name=f"project-dm-{worker}-run",
+    ).start()
     return RedirectResponse("/jobs", status_code=303)
 
 
