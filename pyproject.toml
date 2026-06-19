@@ -23,7 +23,7 @@ dependencies = [
 
 [project.scripts]
 project-dm = "project_dm.cli:main"
-project-dm-web = "project_dm.web.app:main"
+serve = "project_dm.web.app:main"
 emag-explore = "project_dm.commands.explore_emag:main"
 db-check-access = "project_dm.commands.check_db_access:main"
 db-configure-permissions = "project_dm.commands.configure_db_permissions:main"

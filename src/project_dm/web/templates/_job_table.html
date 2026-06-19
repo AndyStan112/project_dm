@@ -33,7 +33,11 @@
         </td>
       </tr>
       {% if job.last_error %}
-      <tr class="error-row"><td></td><td colspan="5">{{ job.last_error }}</td></tr>
+      <tr class="error-row">
+        <td></td>
+        <td colspan="4">{{ job.last_error }}</td>
+        <td><a class="text-link" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a></td>
+      </tr>
       {% endif %}
     {% else %}
       {% for row in recent_jobs %}

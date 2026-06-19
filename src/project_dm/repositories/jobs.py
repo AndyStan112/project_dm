@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -137,6 +138,13 @@ def claim_pending_job(
     job_types: tuple[JobType, ...] | None = None,
     brand_id: int | None = None,
 ) -> Job | None:
+    print(
+        "[jobs] claim_pending_job start "
+        f"job_types={[job_type.value for job_type in job_types] if job_types else None} "
+        f"brand_id={brand_id}",
+        file=sys.stderr,
+        flush=True,
+    )
     statement = (
         select(Job)
         .where(Job.status == JobStatus.PENDING.value)
@@ -151,13 +159,44 @@ def claim_pending_job(
     if brand_id is not None:
         statement = statement.where(Job.brand_id == brand_id)
 
+    debug_rows = list(
+        session.execute(
+            select(
+                Job.id,
+                Job.job_type,
+                Job.status,
+                Job.priority,
+                Job.current_offset,
+                Job.family_id,
+                Job.target_url,
+            )
+            .where(Job.status == JobStatus.PENDING.value)
+            .order_by(Job.priority.asc(), Job.created_at.asc())
+        )
+    )
+    print(
+        "[jobs] claim_pending_job candidates "
+        f"{[(row.id, row.job_type, row.status, row.priority, row.current_offset) for row in debug_rows]}",
+        file=sys.stderr,
+        flush=True,
+    )
+
     job = session.scalar(statement)
     if job is None:
+        print("[jobs] claim_pending_job none", file=sys.stderr, flush=True)
         return None
 
+    print(
+        "[jobs] claim_pending_job claimed "
+        f"job_id={job.id} type={job.job_type} status={job.status} "
+        f"priority={job.priority} offset={job.current_offset} target={job.target_url}",
+        file=sys.stderr,
+        flush=True,
+    )
     job.status = JobStatus.RUNNING.value
     job.attempts += 1
     job.locked_at = datetime.now(UTC)
+    job.last_error = None
     session.flush()
     return job
 
@@ -167,8 +206,18 @@ def set_job_status(
     job_id: int,
     status: JobStatus,
 ) -> Job | None:
+    print(
+        f"[jobs] set_job_status job_id={job_id} status={status.value}",
+        file=sys.stderr,
+        flush=True,
+    )
     job = session.get(Job, job_id)
     if job is None:
+        print(
+            f"[jobs] set_job_status missing job_id={job_id}",
+            file=sys.stderr,
+            flush=True,
+        )
         return None
 
     job.status = status.value
@@ -177,7 +226,16 @@ def set_job_status(
         job.finished_at = datetime.now(UTC)
     else:
         job.finished_at = None
+    if status not in {JobStatus.FAILED, JobStatus.BLOCKED}:
+        job.last_error = None
     session.flush()
+    print(
+        "[jobs] set_job_status updated "
+        f"job_id={job_id} status={job.status} locked_at={job.locked_at} "
+        f"finished_at={job.finished_at}",
+        file=sys.stderr,
+        flush=True,
+    )
     return job
 
 

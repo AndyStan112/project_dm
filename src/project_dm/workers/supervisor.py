@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import threading
 from dataclasses import dataclass
 
@@ -44,6 +45,7 @@ def _result_message(result: object) -> str:
 
 
 def _scraper_cycle() -> CycleResult:
+    print("[supervisor] scraper cycle start", file=sys.stderr, flush=True)
     runners = (
         (
             "listing",
@@ -59,10 +61,20 @@ def _scraper_cycle() -> CycleResult:
         ),
     )
     for label, runner in runners:
+        print(
+            f"[supervisor] trying {label}",
+            file=sys.stderr,
+            flush=True,
+        )
         result = runner()
         job_id = _job_id(result)
         status = _result_status(result)
         message = _result_message(result)
+        print(
+            f"[supervisor] {label} result job_id={job_id} status={status} message={message}",
+            file=sys.stderr,
+            flush=True,
+        )
         if job_id is None and status is None:
             continue
         if status in {JobStatus.BLOCKED, JobStatus.FAILED}:

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 import time
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -37,9 +39,52 @@ def _save_json_diagnostic(
 ) -> None:
     directory = Path("data") / "diagnostics" / f"job_{job_id}"
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / f"{label}.json").write_text(
+    path = directory / f"{label}.json"
+    path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
+    )
+    print(
+        f"[reviews] wrote diagnostic file {path}",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+def _save_response_diagnostic(
+    *,
+    job_id: int,
+    label: str,
+    url: str,
+    status: int,
+    headers: dict[str, str],
+    body: str,
+) -> None:
+    _save_json_diagnostic(
+        {
+            "url": url,
+            "status": status,
+            "headers": headers,
+            "body_preview": body[:4_000],
+        },
+        job_id=job_id,
+        label=label,
+    )
+
+
+def _response_error_message(
+    *,
+    url: str,
+    status: int,
+    content_type: str | None,
+    body: str,
+) -> str:
+    preview = " ".join(body.split())[:600]
+    return (
+        f"Review endpoint returned HTTP {status} "
+        f"for {url} "
+        f"(content-type={content_type or 'unknown'}; "
+        f"body={preview!r})"
     )
 
 
@@ -50,6 +95,12 @@ def run_one_review_job(
     min_delay: float = 5.0,
     max_delay: float = 10.0,
 ) -> ReviewRunResult:
+    print(
+        "[reviews] enter run_one_review_job "
+        f"module={__file__} max_pages={max_pages} page_size={page_size}",
+        file=sys.stderr,
+        flush=True,
+    )
     if max_pages is not None and max_pages < 1:
         raise ValueError("max_pages must be positive")
     if page_size < 1 or page_size > 100:
@@ -60,6 +111,11 @@ def run_one_review_job(
     with write_session() as session, session.begin():
         job = claim_pending_job(session, job_types=(JobType.REVIEWS,))
         if job is None:
+            print(
+                "[reviews] no pending review job",
+                file=sys.stderr,
+                flush=True,
+            )
             with write_session() as heartbeat_session, heartbeat_session.begin():
                 update_service_control_state(
                     heartbeat_session,
@@ -79,6 +135,13 @@ def run_one_review_job(
         family_id = job.family_id
         target_url = job.target_url
         offset = job.current_offset
+        print(
+            "[reviews] claimed job "
+            f"id={job_id} family_id={family_id} offset={offset} "
+            f"target_url={target_url}",
+            file=sys.stderr,
+            flush=True,
+        )
         update_service_control_state(
             session,
             "scraper",
@@ -126,6 +189,12 @@ def run_one_review_job(
             product_response.status if product_response is not None else None
         )
         visible_text = page.locator("body").inner_text(timeout=5_000)
+        print(
+            "[reviews] product page "
+            f"job_id={job_id} status={product_status} blocked={visible_page_is_blocked(visible_text)}",
+            file=sys.stderr,
+            flush=True,
+        )
         if product_status in {403, 429} or visible_page_is_blocked(
             visible_text
         ):
@@ -163,9 +232,28 @@ def run_one_review_job(
                 target_url, offset=offset, limit=page_size
             )
             response = context.request.get(reviews_url, timeout=60_000)
-            if response.status in {403, 429}:
-                message = (
-                    f"eMAG blocked review request (HTTP {response.status})."
+            response_body = response.text()
+            print(
+                "[reviews] response "
+                f"job_id={job_id} offset={offset} url={reviews_url} "
+                f"status={response.status} content_type={response.headers.get('content-type')}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if response.status in {403, 405, 429}:
+                message = _response_error_message(
+                    url=reviews_url,
+                    status=response.status,
+                    content_type=response.headers.get("content-type"),
+                    body=response_body,
+                )
+                _save_response_diagnostic(
+                    job_id=job_id,
+                    label="blocked_review_request",
+                    url=reviews_url,
+                    status=response.status,
+                    headers=dict(response.headers),
+                    body=response_body,
                 )
                 with write_session() as session, session.begin():
                     fail_job(
@@ -182,11 +270,46 @@ def run_one_review_job(
                     message=message,
                 )
             if not response.ok:
-                raise RuntimeError(
-                    f"Review endpoint returned HTTP {response.status}"
+                print(
+                    "[reviews] non-ok response "
+                    f"job_id={job_id} offset={offset} "
+                    f"status={response.status} "
+                    f"url={reviews_url} "
+                    f"headers={dict(response.headers)} "
+                    f"body={response_body}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                message = _response_error_message(
+                    url=reviews_url,
+                    status=response.status,
+                    content_type=response.headers.get("content-type"),
+                    body=response_body,
+                )
+                _save_response_diagnostic(
+                    job_id=job_id,
+                    label="invalid_review_response",
+                    url=reviews_url,
+                    status=response.status,
+                    headers=dict(response.headers),
+                    body=response_body,
+                )
+                with write_session() as session, session.begin():
+                    fail_job(
+                        session,
+                        job_id=job_id,
+                        status=JobStatus.FAILED,
+                        message=message,
+                    )
+                return ReviewRunResult(
+                    job_id=job_id,
+                    pages_processed=pages_processed,
+                    reviews_upserted=reviews_upserted,
+                    status=JobStatus.FAILED,
+                    message=message,
                 )
 
-            payload = response.json()
+            payload = json.loads(response_body)
             review_page = parse_review_page(payload)
             with write_session() as session, session.begin():
                 for review in review_page.reviews:
@@ -240,9 +363,15 @@ def run_one_review_job(
         message = f"Playwright timeout: {exc}"
     except Exception as exc:
         message = f"{type(exc).__name__}: {exc}"
-        if "payload" in locals():
-            _save_json_diagnostic(
-                payload, job_id=job_id, label="invalid_review_response"
+        traceback.print_exc()
+        if "response_body" in locals():
+            _save_response_diagnostic(
+                job_id=job_id,
+                label="review_response_exception",
+                url=reviews_url,
+                status=response.status,
+                headers=dict(response.headers),
+                body=response_body,
             )
     finally:
         if browser is not None:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import threading
+import sys
+import json
 from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
@@ -51,6 +53,7 @@ from project_dm.workers.supervisor import (
 
 PACKAGE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+DIAGNOSTICS_DIR = Path("data") / "diagnostics"
 
 app = FastAPI(title="Project DM Dashboard")
 app.mount(
@@ -111,6 +114,10 @@ def _dashboard_payload(session) -> dict[str, object]:
 
 def _as_bool(value: str | None) -> bool:
     return value in {"1", "true", "yes", "on"}
+
+
+def _diagnostic_directory(job_id: int) -> Path:
+    return DIAGNOSTICS_DIR / f"job_{job_id}"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -238,6 +245,11 @@ def control_worker(service_name: str, action: str) -> RedirectResponse:
 
 @app.post("/jobs/{job_id}/{action}")
 def control_job(job_id: int, action: str) -> RedirectResponse:
+    print(
+        f"[web] control_job job_id={job_id} action={action}",
+        file=sys.stderr,
+        flush=True,
+    )
     actions = {
         "pause": JobStatus.PAUSED,
         "resume": JobStatus.PENDING,
@@ -254,7 +266,38 @@ def control_job(job_id: int, action: str) -> RedirectResponse:
             raise HTTPException(status_code=400, detail="Unsupported job action")
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
+        print(
+            f"[web] control_job updated job_id={job_id} status={job.status}",
+            file=sys.stderr,
+            flush=True,
+        )
     return RedirectResponse("/jobs", status_code=303)
+
+
+@app.get("/jobs/{job_id}/diagnostics")
+def job_diagnostics(job_id: int) -> JSONResponse:
+    directory = _diagnostic_directory(job_id)
+    if not directory.exists():
+        raise HTTPException(status_code=404, detail="No diagnostics found")
+
+    files: list[dict[str, object]] = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file():
+            continue
+        entry: dict[str, object] = {
+            "name": path.name,
+            "size": path.stat().st_size,
+        }
+        if path.suffix in {".json", ".txt", ".html"}:
+            text = path.read_text(encoding="utf-8", errors="replace")
+            entry["text"] = text[:20_000]
+            if path.suffix == ".json":
+                try:
+                    entry["json"] = json.loads(text)
+                except json.JSONDecodeError:
+                    pass
+        files.append(entry)
+    return JSONResponse({"job_id": job_id, "files": files})
 
 
 @app.post("/brands")
@@ -295,6 +338,12 @@ def run_worker(
     max_pages: Annotated[int | None, Form()] = 1,
     page_size: Annotated[int, Form()] = 10,
 ) -> RedirectResponse:
+    print(
+        "[web] run_worker "
+        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size}",
+        file=sys.stderr,
+        flush=True,
+    )
     if worker not in {"listing", "product", "reviews"}:
         raise HTTPException(status_code=400, detail="Unsupported worker")
     if max_pages is not None and max_pages < 1:
@@ -316,6 +365,7 @@ def run_worker(
 
 @app.post("/workers/reviews/queue-missing")
 def queue_missing_reviews() -> RedirectResponse:
+    print("[web] queue_missing_reviews", file=sys.stderr, flush=True)
     with write_session() as session, session.begin():
         queued = queue_missing_review_jobs(session)
     return RedirectResponse(f"/workers?queued_reviews={queued}", status_code=303)
