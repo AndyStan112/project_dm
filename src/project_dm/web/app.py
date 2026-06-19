@@ -11,13 +11,13 @@ from dataclasses import asdict
 import uvicorn
 from fastapi import Body, FastAPI, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from project_dm.brands import normalize_brand
 from project_dm.db import read_session, write_session
-from project_dm.models import Job
+from project_dm.models import Job, ProductFamily
 from project_dm.repositories.brands import list_brands, upsert_brand
 from project_dm.repositories.dashboard import (
     dashboard_stats,
@@ -60,6 +60,7 @@ from project_dm.scraping.reviews import build_reviews_url
 
 PACKAGE_DIR = Path(__file__).parent
 templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
+STATIC_DIR = PACKAGE_DIR / "static"
 DIAGNOSTICS_DIR = Path("data") / "diagnostics"
 DEFAULT_BROWSER_PUBLIC_URL = "https://vnc.windogs.win"
 
@@ -150,6 +151,31 @@ def _browser_public_url() -> str:
     return DEFAULT_BROWSER_PUBLIC_URL
 
 
+def _static_text_response(filename: str, media_type: str) -> Response:
+    return Response(
+        content=(STATIC_DIR / filename).read_text(encoding="utf-8"),
+        media_type=media_type,
+    )
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def manifest() -> Response:
+    return _static_text_response(
+        "manifest.webmanifest",
+        "application/manifest+json",
+    )
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> Response:
+    return _static_text_response("sw.js", "application/javascript")
+
+
+@app.get("/icon.svg", include_in_schema=False)
+def app_icon() -> Response:
+    return _static_text_response("icon.svg", "image/svg+xml")
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, live: str | None = None) -> HTMLResponse:
     with read_session() as session:
@@ -210,8 +236,6 @@ def jobs(
 def workers(
     request: Request,
     queued_reviews: int | None = None,
-    review_page_size: int = 10,
-    review_max_pages: int = 1,
 ) -> HTMLResponse:
     with read_session() as session:
         existing = {
@@ -252,8 +276,6 @@ def workers(
                 row["last_heartbeat_at"] is not None for row in rows
             ),
             queued_reviews=queued_reviews,
-            review_page_size=review_page_size,
-            review_max_pages=review_max_pages,
         ),
     )
 
@@ -351,10 +373,14 @@ def solve_job(request: Request, job_id: int) -> HTMLResponse:
             raise HTTPException(
                 status_code=400, detail="Job is missing review metadata"
             )
-        review_limit = (
-            job.total_expected
-            or job.current_offset
-            or 10
+        family = session.get(ProductFamily, job.family_id)
+        review_limit = max(
+            (
+                job.total_expected
+                or (family.review_count if family is not None else None)
+                or 10
+            ) - job.current_offset,
+            1,
         )
         review_url = build_reviews_url(
             job.target_url,
@@ -429,8 +455,6 @@ def _run_worker(
     worker: str,
     *,
     max_pages: int | None = 1,
-    page_size: int = 10,
-    fetch_all: bool = False,
     attended_browser: bool = False,
 ) -> None:
     if worker == "listing":
@@ -438,24 +462,18 @@ def _run_worker(
     elif worker == "product":
         run_product_jobs(max_jobs=1)
     elif worker == "reviews":
-        run_one_review_job(
-            max_pages=max_pages,
-            page_size=0 if fetch_all else page_size,
-            attended_browser=attended_browser,
-        )
+        run_one_review_job(attended_browser=attended_browser)
 
 
 @app.post("/workers/{worker}/run")
 def run_worker(
     worker: str,
     max_pages: Annotated[int | None, Form()] = 1,
-    page_size: Annotated[int, Form()] = 10,
-    fetch_all: Annotated[bool, Form()] = False,
     attended_browser: Annotated[bool, Form()] = False,
 ) -> RedirectResponse:
     print(
         "[web] run_worker "
-        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size} fetch_all={fetch_all} attended_browser={attended_browser}",
+        f"module={__file__} worker={worker} max_pages={max_pages} attended_browser={attended_browser}",
         file=sys.stderr,
         flush=True,
     )
@@ -463,15 +481,11 @@ def run_worker(
         raise HTTPException(status_code=400, detail="Unsupported worker")
     if max_pages is not None and max_pages < 1:
         raise HTTPException(status_code=422, detail="max_pages must be positive")
-    if page_size < 1 and not fetch_all:
-        raise HTTPException(status_code=422, detail="page_size must be positive")
     threading.Thread(
         target=_run_worker,
         kwargs={
             "worker": worker,
             "max_pages": max_pages,
-            "page_size": page_size,
-            "fetch_all": fetch_all,
             "attended_browser": attended_browser,
         },
         daemon=True,

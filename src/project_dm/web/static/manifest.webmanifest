@@ -1,0 +1,35 @@
+{
+  "name": "Project DM",
+  "short_name": "Project DM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f1",
+  "theme_color": "#14251e",
+  "description": "Dashboard for eMAG review collection and mobile CAPTCHA solving.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/"
+    },
+    {
+      "name": "Workers",
+      "short_name": "Workers",
+      "url": "/workers"
+    },
+    {
+      "name": "Jobs",
+      "short_name": "Jobs",
+      "url": "/jobs"
+    }
+  ]
+}

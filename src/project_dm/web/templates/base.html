@@ -3,8 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14251e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>{% block title %}Project DM{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon.svg">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -55,5 +60,50 @@
     </main>
   </div>
   {% block scripts %}{% endblock %}
+  <script>
+  (function () {
+    if (!("serviceWorker" in navigator)) {
+      window.ProjectDMPWA = {
+        enableNotifications: async () => ({ status: "unsupported" }),
+        notify: async () => false,
+      };
+      return;
+    }
+
+    const swReady = navigator.serviceWorker.register("/sw.js", { scope: "/" })
+      .then(() => navigator.serviceWorker.ready)
+      .catch((error) => {
+        console.warn("Service worker registration failed:", error);
+        return null;
+      });
+
+    const enableNotifications = async () => {
+      if (!("Notification" in window)) {
+        return { status: "unsupported" };
+      }
+      const permission = await Notification.requestPermission();
+      return { status: permission };
+    };
+
+    const notify = async (title, options = {}) => {
+      if (!("Notification" in window) || Notification.permission !== "granted") {
+        return false;
+      }
+      const registration = await swReady;
+      if (registration && typeof registration.showNotification === "function") {
+        await registration.showNotification(title, options);
+        return true;
+      }
+      new Notification(title, options);
+      return true;
+    };
+
+    window.ProjectDMPWA = {
+      enableNotifications,
+      notify,
+      ready: swReady,
+    };
+  })();
+  </script>
 </body>
 </html>

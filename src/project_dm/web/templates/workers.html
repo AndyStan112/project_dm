@@ -110,33 +110,15 @@
       <form method="post" action="/workers/listing/run"><button class="button secondary">Listing page</button></form>
       <form method="post" action="/workers/product/run"><button class="button secondary">Product page</button></form>
       <form method="post" action="/workers/reviews/run" class="inline-form">
-        <label>
-          Review page size
-          <input name="page_size" type="number" min="1" max="100" value="{{ review_page_size }}">
-        </label>
-        <label>
-          Pages per click
-          <input name="max_pages" type="number" min="1" value="{{ review_max_pages }}">
-        </label>
-        <label class="checkbox-label">
-          <input name="fetch_all" type="checkbox" value="1">
-          Fetch all reviews at once
-        </label>
-        <label class="checkbox-label">
-          <input name="attended_browser" type="checkbox" value="1">
-          Use remote browser
-        </label>
-        <button class="button secondary" type="submit">Review page</button>
+        <input type="hidden" name="attended_browser" value="1">
+        <button class="button" type="submit">Review all in browser</button>
       </form>
       <form method="post" action="/workers/reviews/run" class="inline-form">
-        <input type="hidden" name="page_size" value="0">
-        <input type="hidden" name="fetch_all" value="1">
-        <input type="hidden" name="attended_browser" value="1">
-        <button class="button" type="submit">Review in browser</button>
+        <button class="button secondary" type="submit">Review all reviews</button>
       </form>
       <form method="post" action="/workers/reviews/queue-missing"><button class="button">Continue review backlog</button></form>
     </div>
-    <p class="hint">Review runs now use the values you set here. The scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>
+    <p class="hint">Review runs always fetch the full remaining review set in one shot. The scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>
   </article>
 </section>
 {% endblock %}

@@ -135,8 +135,6 @@ def apply_review_payload(
 
 def run_one_review_job(
     *,
-    max_pages: int | None = 1,
-    page_size: int = 10,
     min_delay: float = 5.0,
     max_delay: float = 10.0,
     attended_browser: bool | None = None,
@@ -145,14 +143,10 @@ def run_one_review_job(
         attended_browser = _attended_browser_mode()
     print(
         "[reviews] enter run_one_review_job "
-        f"module={__file__} max_pages={max_pages} page_size={page_size} attended={attended_browser}",
+        f"module={__file__} attended={attended_browser}",
         file=sys.stderr,
         flush=True,
     )
-    if max_pages is not None and max_pages < 1:
-        raise ValueError("max_pages must be positive")
-    if page_size > 10_000:
-        raise ValueError("page_size must be 10000 or less")
     if min_delay < 0 or max_delay < min_delay:
         raise ValueError("Invalid delay range")
 
@@ -215,22 +209,20 @@ def run_one_review_job(
             message=message,
         )
 
-    effective_page_size = page_size
-    if effective_page_size <= 0:
-        with write_session() as session:
-            family = session.get(ProductFamily, family_id)
-            if family is not None and family.review_count:
-                effective_page_size = int(family.review_count)
-            elif job.total_expected:
-                effective_page_size = int(job.total_expected)
-            else:
-                effective_page_size = 1_000
-        print(
-            "[reviews] auto page_size "
-            f"job_id={job_id} effective_page_size={effective_page_size}",
-            file=sys.stderr,
-            flush=True,
-        )
+    with write_session() as session:
+        family = session.get(ProductFamily, family_id)
+        if family is not None and family.review_count:
+            effective_page_size = int(family.review_count)
+        elif job.total_expected:
+            effective_page_size = int(job.total_expected)
+        else:
+            effective_page_size = 1_000
+    print(
+        "[reviews] full fetch page_size "
+        f"job_id={job_id} effective_page_size={effective_page_size}",
+        file=sys.stderr,
+        flush=True,
+    )
 
     pages_processed = 0
     reviews_upserted = 0
@@ -473,17 +465,6 @@ def run_one_review_job(
                     reviews_upserted=reviews_upserted,
                     status=checkpoint_status,
                     message="Review collection completed.",
-                )
-
-            if max_pages is not None and pages_processed >= max_pages:
-                with write_session() as session, session.begin():
-                    set_job_status(session, job_id, JobStatus.PAUSED)
-                return ReviewRunResult(
-                    job_id=job_id,
-                    pages_processed=pages_processed,
-                    reviews_upserted=reviews_upserted,
-                    status=JobStatus.PAUSED,
-                    message="Paused after reaching the page limit.",
                 )
 
             time.sleep(random.uniform(min_delay, max_delay))

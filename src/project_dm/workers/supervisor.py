@@ -53,7 +53,7 @@ def _scraper_cycle() -> CycleResult:
         ),
         (
             "reviews",
-            lambda: run_one_review_job(max_pages=1, min_delay=0, max_delay=0),
+            lambda: run_one_review_job(min_delay=0, max_delay=0),
         ),
         (
             "product",

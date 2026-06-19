@@ -3,6 +3,7 @@
 {% block heading %}Collection overview{% endblock %}
 {% block eyebrow %}Current dataset{% endblock %}
 {% block actions %}
+  <button class="button secondary" type="button" onclick="ProjectDMPWA.enableNotifications().then(() => ProjectDMPWA.notify('Project DM', { body: 'Notifications are enabled.' }))">Enable notifications</button>
   <a class="button secondary" href="/reviews">Explore reviews</a>
   <a class="button" href="/jobs">Open queue</a>
   {% if live %}
@@ -170,6 +171,11 @@
   if (!liveEnabled) return;
 
   const endpoint = "/api/dashboard";
+  const blockedIds = new Set([
+    {% for row in blocked_jobs %}
+    {{ row.job.id }}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  ]);
   const metrics = {
     reviews: document.getElementById("metric-reviews"),
     reviewsDetail: document.getElementById("metric-reviews-detail"),
@@ -300,8 +306,19 @@
       metrics.ratingTotal.textContent = `${formatInt(data.stats.reviews)} total`;
       renderRatings(data.rating_counts);
       renderJobStatus(data.job_counts);
+      const nextBlockedIds = new Set(data.blocked_jobs.map((row) => row.id));
+      const newlyBlocked = data.blocked_jobs.filter((row) => !blockedIds.has(row.id));
       renderBlockedAlerts(data.blocked_jobs);
       renderRecentJobs(data.recent_jobs);
+      if (newlyBlocked.length && "Notification" in window && Notification.permission === "granted") {
+        const row = newlyBlocked[0];
+        const label = row.family_name || row.brand_slug || "Unassigned";
+        await window.ProjectDMPWA.notify(`Blocked job #${row.id}`, {
+          body: `${label} needs a human to clear the challenge.`,
+        });
+      }
+      blockedIds.clear();
+      nextBlockedIds.forEach((id) => blockedIds.add(id));
     } catch (error) {
       console.error("Dashboard refresh failed", error);
     }

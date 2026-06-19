@@ -37,8 +37,10 @@ h2 { margin: 2px 0 0; font-size: 18px; letter-spacing: -.02em; }
 .topbar-actions, .worker-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 .button { border: 0; border-radius: 7px; padding: 10px 14px; color: white; background: var(--green); cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .button:hover { filter: brightness(.94); }
+.button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid rgba(20,107,74,.25); outline-offset: 2px; }
 .button.secondary { color: var(--green); background: var(--green-soft); }
 .button.ghost { color: var(--muted); background: transparent; border: 1px solid var(--line); }
+.button, button, input, select { min-height: 44px; }
 .metric-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
 .metric { min-height: 145px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: var(--shadow); display: flex; flex-direction: column; justify-content: space-between; }
 .metric span { color: var(--muted); font-weight: 700; }
@@ -104,6 +106,10 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .review-heading, .review-heading > div { display: flex; gap: 9px; align-items: center; justify-content: space-between; }
 .review-main p { margin: 10px 0; color: #414c46; }
 .review-meta { display: flex; gap: 7px 14px; flex-wrap: wrap; color: var(--muted); font-size: 10px; }
+.solve-actions { display: grid; gap: 10px; margin-top: 14px; }
+.solve-actions .button { width: 100%; }
+.solve-steps { margin: 14px 0 0; padding: 0 0 0 18px; color: var(--muted); display: grid; gap: 6px; }
+.solve-steps strong { color: var(--ink); }
 .empty-state { padding: 45px; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 12px; background: white; }
 .notice-panel { border-left: 4px solid var(--orange); }
 .notice-panel code { padding: 1px 4px; border-radius: 4px; background: #f4efe7; }
@@ -125,6 +131,11 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 @media (max-width: 720px) {
   .app-shell { display: block; }.sidebar { position: static; width: 100%; height: auto; padding: 12px; flex-direction: row; align-items: center; overflow-x: auto; }.brand-mark { margin: 0 8px 0 0; }.brand-icon { width: 36px; height: 36px; }nav { display: flex; }.sidebar-note { display: none; }
   main { padding: 24px 16px 45px; }.topbar { align-items: start; gap: 18px; }.topbar-actions { justify-content: end; }
+  .topbar-actions, .worker-buttons, .blocked-actions, .solve-actions, .inline-form, .filter-form { width: 100%; }
+  .topbar-actions, .worker-buttons, .blocked-actions { flex-direction: column; align-items: stretch; }
+  .topbar-actions .button, .worker-buttons .button, .blocked-actions .button, .inline-form .button, .solve-actions .button { width: 100%; }
+  .inline-form label, .inline-form input, .inline-form select, .filter-form label, .filter-form input, .filter-form select { width: 100%; min-width: 0; }
   .metric-grid, .two-column, .detail-grid, .product-grid, .review-layout { grid-template-columns: 1fr; }.ratings-side { position: static; }
   .filter-form label, .filter-form input, .filter-form select { width: 100%; }.review-card { grid-template-columns: 44px 1fr; }.review-score { width: 42px; height: 42px; }
+  .solve-actions { margin-top: 16px; }
 }

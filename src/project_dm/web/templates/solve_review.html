@@ -5,6 +5,7 @@
 {% block actions %}
   <a class="button secondary" href="/jobs">Back to jobs</a>
   <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+  <button class="button secondary" type="button" onclick="ProjectDMPWA.enableNotifications().then(() => ProjectDMPWA.notify('Project DM', { body: 'Notifications are enabled.' }))">Enable notifications</button>
 {% endblock %}
 {% block content %}
 <section class="panel notice-panel">
@@ -12,11 +13,18 @@
     <div><p class="eyebrow">Target</p><h2>Use your browser to clear the challenge</h2></div>
     <span class="panel-tag">job #{{ job.id }}</span>
   </div>
-  <p class="hint">Open the review endpoint below, solve the challenge if it appears, then click fetch.</p>
-  <p><a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Open review endpoint</a></p>
+  <p class="hint">This page is sized for mobile. Keep it open, solve the challenge in the remote browser, then fetch the JSON back into Project DM.</p>
+  <ol class="solve-steps">
+    <li><strong>Open the browser</strong> and clear any CAPTCHA that appears.</li>
+    <li><strong>Open the review endpoint</strong> if you need to verify the payload directly.</li>
+    <li><strong>Fetch all reviews</strong> when the browser session is ready.</li>
+  </ol>
+  <div class="solve-actions">
+    <a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Open review endpoint</a>
+    <button class="button" id="fetch-button" type="button">Fetch all reviews from this browser</button>
+  </div>
   <p class="hint" id="solve-status">Ready.</p>
   <input type="hidden" id="review-url" value="{{ review_url }}">
-  <button class="button" id="fetch-button" type="button">Fetch reviews from this browser</button>
 </section>
 {% endblock %}
 {% block scripts %}
@@ -64,6 +72,9 @@
         button.disabled = false;
         return;
       }
+      await window.ProjectDMPWA.notify("Reviews imported", {
+        body: "The captured review payload was saved successfully.",
+      });
       window.location.href = "/jobs";
     } catch (error) {
       console.error(error);

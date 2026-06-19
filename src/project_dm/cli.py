@@ -200,26 +200,19 @@ def run_product_worker(
 
 @worker_app.command("reviews")
 def run_review_worker(
-    max_pages: int = typer.Option(
-        default=1,
-        min=1,
-        help="Pause after this many review pages.",
-    ),
-    all_pages: bool = typer.Option(
-        default=False,
-        help="Continue until the review job is complete.",
-    ),
-    page_size: int = typer.Option(default=10, min=1, max=100),
     min_delay: float = typer.Option(default=5.0, min=0),
     max_delay: float = typer.Option(default=10.0, min=0),
+    attended_browser: bool = typer.Option(
+        default=False,
+        help="Open the remote browser session while fetching reviews.",
+    ),
 ) -> None:
-    """Process one checkpointed review job."""
+    """Process one pending review job and fetch all reviews in one pass."""
     try:
         result = run_one_review_job(
-            max_pages=None if all_pages else max_pages,
-            page_size=page_size,
             min_delay=min_delay,
             max_delay=max_delay,
+            attended_browser=attended_browser,
         )
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
