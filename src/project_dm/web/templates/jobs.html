@@ -6,6 +6,11 @@
   <a class="button secondary" href="/workers">Manage workers</a>
   <form method="post" action="/workers/product/run"><button class="button secondary">Run product</button></form>
   <form method="post" action="/workers/reviews/run"><button class="button">Run reviews</button></form>
+  <form method="post" action="/workers/reviews/run" class="inline-form">
+    <input type="hidden" name="page_size" value="0">
+    <input type="hidden" name="fetch_all" value="1">
+    <button class="button secondary" type="submit">Run all reviews</button>
+  </form>
 {% endblock %}
 {% block content %}
 <section class="panel filter-panel">

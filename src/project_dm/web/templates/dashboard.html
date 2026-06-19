@@ -40,6 +40,36 @@
   </article>
 </section>
 
+<section class="panel notice-panel" id="blocked-alert-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Attention</p><h2>Blocked jobs need a human</h2></div>
+    <span class="panel-tag" id="blocked-alert-count">{{ blocked_jobs|length }} active</span>
+  </div>
+  <div class="alert-list" id="blocked-alert-list">
+    {% if blocked_jobs %}
+      {% for row in blocked_jobs %}
+      {% set job = row.job %}
+      <article class="blocked-card">
+        <div>
+          <strong>#{{ job.id }} {{ job.job_type }}</strong>
+          <small>{{ row.family_name or row.brand_slug or "Unassigned" }}</small>
+          <p>{{ job.last_error or "No error message recorded." }}</p>
+        </div>
+        <div class="blocked-actions">
+          {% if job.target_url %}
+          <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
+          {% endif %}
+          <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
+          <form method="post" action="/jobs/{{ job.id }}/resume"><button type="submit">Resume</button></form>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No blocked jobs right now.</div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="two-column">
   <article class="panel">
     <div class="panel-heading">
@@ -145,6 +175,8 @@
     familiesDetail: document.getElementById("metric-families-detail"),
     queue: document.getElementById("metric-queue"),
     blocked: document.getElementById("metric-blocked"),
+    blockedAlertCount: document.getElementById("blocked-alert-count"),
+    blockedAlertList: document.getElementById("blocked-alert-list"),
     ratingTotal: document.getElementById("rating-total"),
     ratingChart: document.getElementById("rating-chart"),
     jobGrid: document.getElementById("job-status-grid"),
@@ -183,6 +215,30 @@
         <strong>${escapeHtml(row.count)}</strong>
         <small>${escapeHtml(row.status)}</small>
       </a>
+    `).join("");
+  };
+
+  const renderBlockedAlerts = (blockedJobs) => {
+    if (!metrics.blockedAlertList) return;
+    if (!blockedJobs.length) {
+      metrics.blockedAlertCount.textContent = "0 active";
+      metrics.blockedAlertList.innerHTML = '<div class="empty-state">No blocked jobs right now.</div>';
+      return;
+    }
+    metrics.blockedAlertCount.textContent = `${blockedJobs.length} active`;
+    metrics.blockedAlertList.innerHTML = blockedJobs.map((job) => `
+      <article class="blocked-card">
+        <div>
+          <strong>#${escapeHtml(job.id)} ${escapeHtml(job.job_type)}</strong>
+          <small>${escapeHtml(job.family_name || job.brand_slug || "Unassigned")}</small>
+          <p>${escapeHtml(job.last_error || "No error message recorded.")}</p>
+        </div>
+        <div class="blocked-actions">
+          ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}" target="_blank" rel="noreferrer">Open target</a>` : ""}
+          <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>
+          <form method="post" action="/jobs/${encodeURIComponent(job.id)}/resume"><button type="submit">Resume</button></form>
+        </div>
+      </article>
     `).join("");
   };
 
@@ -240,6 +296,7 @@
       metrics.ratingTotal.textContent = `${formatInt(data.stats.reviews)} total`;
       renderRatings(data.rating_counts);
       renderJobStatus(data.job_counts);
+      renderBlockedAlerts(data.blocked_jobs);
       renderRecentJobs(data.recent_jobs);
     } catch (error) {
       console.error("Dashboard refresh failed", error);

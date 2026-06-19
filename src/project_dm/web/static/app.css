@@ -107,6 +107,15 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .empty-state { padding: 45px; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 12px; background: white; }
 .notice-panel { border-left: 4px solid var(--orange); }
 .notice-panel code { padding: 1px 4px; border-radius: 4px; background: #f4efe7; }
+.alert-list { display: grid; gap: 12px; }
+.blocked-card { padding: 16px; border: 1px solid #f1d1c3; border-radius: 10px; background: #fff7f2; display: grid; gap: 12px; }
+.blocked-card strong { display: block; margin-bottom: 4px; }
+.blocked-card small { display: block; color: var(--muted); margin-bottom: 8px; }
+.blocked-card p { margin: 0; color: var(--red); font-size: 12px; }
+.blocked-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.blocked-actions form { margin: 0; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; }
+.checkbox-label input { min-width: auto; margin: 0; }
 .workers-grid .status-tile strong { font-size: 16px; }
 .workers-grid .status-tile small { text-transform: none; }
 @media (max-width: 1050px) {

@@ -25,6 +25,7 @@ from project_dm.repositories.dashboard import (
     list_jobs_for_dashboard,
     list_reviews,
     rating_counts,
+    recent_blocked_jobs,
     recent_jobs,
     review_summary,
 )
@@ -93,6 +94,21 @@ def _dashboard_payload(session) -> dict[str, object]:
             }
             for row in recent_jobs(session)
         ],
+        "blocked_jobs": [
+            {
+                "id": row["job"].id,
+                "job_type": row["job"].job_type,
+                "status": row["job"].status,
+                "target_url": row["job"].target_url,
+                "current_offset": row["job"].current_offset,
+                "total_expected": row["job"].total_expected,
+                "attempts": row["job"].attempts,
+                "last_error": row["job"].last_error,
+                "family_name": row["family_name"],
+                "brand_slug": row["brand_slug"],
+            }
+            for row in recent_blocked_jobs(session)
+        ],
         "worker_status": [
             {
                 "service_name": control.service_name,
@@ -132,6 +148,7 @@ def dashboard(request: Request, live: str | None = None) -> HTMLResponse:
             job_counts=job_status_counts(session),
             rating_counts=rating_counts(session),
             recent_jobs=recent_jobs(session),
+            blocked_jobs=recent_blocked_jobs(session),
             brands=list_brands(session),
             worker_status=worker_status,
             scraper_lane_count=SCRAPER_LANE_COUNT,
@@ -187,6 +204,7 @@ def workers(
             control.service_name: control
             for control in list_service_controls(session)
         }
+        blocked_jobs = recent_blocked_jobs(session)
     rows: list[dict[str, object]] = []
     for service_name in SERVICE_NAMES:
         control = existing.get(service_name)
@@ -215,6 +233,7 @@ def workers(
             request,
             active="workers",
             controls=rows,
+            blocked_jobs=blocked_jobs,
             worker_daemon_online=any(
                 row["last_heartbeat_at"] is not None for row in rows
             ),
@@ -323,13 +342,17 @@ def _run_worker(
     *,
     max_pages: int | None = 1,
     page_size: int = 10,
+    fetch_all: bool = False,
 ) -> None:
     if worker == "listing":
         run_one_listing_job(max_pages=max_pages)
     elif worker == "product":
         run_product_jobs(max_jobs=1)
     elif worker == "reviews":
-        run_one_review_job(max_pages=max_pages, page_size=page_size)
+        run_one_review_job(
+            max_pages=max_pages,
+            page_size=0 if fetch_all else page_size,
+        )
 
 
 @app.post("/workers/{worker}/run")
@@ -337,10 +360,11 @@ def run_worker(
     worker: str,
     max_pages: Annotated[int | None, Form()] = 1,
     page_size: Annotated[int, Form()] = 10,
+    fetch_all: Annotated[bool, Form()] = False,
 ) -> RedirectResponse:
     print(
         "[web] run_worker "
-        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size}",
+        f"module={__file__} worker={worker} max_pages={max_pages} page_size={page_size} fetch_all={fetch_all}",
         file=sys.stderr,
         flush=True,
     )
@@ -348,7 +372,7 @@ def run_worker(
         raise HTTPException(status_code=400, detail="Unsupported worker")
     if max_pages is not None and max_pages < 1:
         raise HTTPException(status_code=422, detail="max_pages must be positive")
-    if page_size < 1:
+    if page_size < 1 and not fetch_all:
         raise HTTPException(status_code=422, detail="page_size must be positive")
     threading.Thread(
         target=_run_worker,
@@ -356,6 +380,7 @@ def run_worker(
             "worker": worker,
             "max_pages": max_pages,
             "page_size": page_size,
+            "fetch_all": fetch_all,
         },
         daemon=True,
         name=f"project-dm-{worker}-run",

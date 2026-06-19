@@ -11,6 +11,7 @@ from pathlib import Path
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from project_dm.db import write_session
+from project_dm.models import ProductFamily
 from project_dm.repositories.jobs import (
     checkpoint_review_page,
     claim_pending_job,
@@ -103,8 +104,8 @@ def run_one_review_job(
     )
     if max_pages is not None and max_pages < 1:
         raise ValueError("max_pages must be positive")
-    if page_size < 1 or page_size > 100:
-        raise ValueError("page_size must be between 1 and 100")
+    if page_size > 10_000:
+        raise ValueError("page_size must be 10000 or less")
     if min_delay < 0 or max_delay < min_delay:
         raise ValueError("Invalid delay range")
 
@@ -165,6 +166,23 @@ def run_one_review_job(
             reviews_upserted=0,
             status=JobStatus.FAILED,
             message=message,
+        )
+
+    effective_page_size = page_size
+    if effective_page_size <= 0:
+        with write_session() as session:
+            family = session.get(ProductFamily, family_id)
+            if family is not None and family.review_count:
+                effective_page_size = int(family.review_count)
+            elif job.total_expected:
+                effective_page_size = int(job.total_expected)
+            else:
+                effective_page_size = 1_000
+        print(
+            "[reviews] auto page_size "
+            f"job_id={job_id} effective_page_size={effective_page_size}",
+            file=sys.stderr,
+            flush=True,
         )
 
     pages_processed = 0
@@ -229,7 +247,7 @@ def run_one_review_job(
                 )
 
             reviews_url = build_reviews_url(
-                target_url, offset=offset, limit=page_size
+                target_url, offset=offset, limit=effective_page_size
             )
             response = context.request.get(reviews_url, timeout=60_000)
             response_body = response.text()

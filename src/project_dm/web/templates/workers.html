@@ -23,6 +23,34 @@
   {% endif %}
 </section>
 
+{% if blocked_jobs %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Blocked</p><h2>Jobs waiting on a human</h2></div>
+    <span class="panel-tag">{{ blocked_jobs|length }} active</span>
+  </div>
+  <div class="alert-list">
+    {% for row in blocked_jobs %}
+    {% set job = row.job %}
+    <article class="blocked-card">
+      <div>
+        <strong>#{{ job.id }} {{ job.job_type }}</strong>
+        <small>{{ row.family_name or row.brand_slug or "Unassigned" }}</small>
+        <p>{{ job.last_error or "No error message recorded." }}</p>
+      </div>
+      <div class="blocked-actions">
+        {% if job.target_url %}
+        <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
+        {% endif %}
+        <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
+        <form method="post" action="/jobs/{{ job.id }}/resume"><button type="submit">Resume</button></form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <section class="two-column">
   <article class="panel">
     <div class="panel-heading">
@@ -87,6 +115,10 @@
         <label>
           Pages per click
           <input name="max_pages" type="number" min="1" value="{{ review_max_pages }}">
+        </label>
+        <label class="checkbox-label">
+          <input name="fetch_all" type="checkbox" value="1">
+          Fetch all reviews at once
         </label>
         <button class="button secondary" type="submit">Review page</button>
       </form>
