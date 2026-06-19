@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from project_dm.brands import normalize_brand
 from project_dm.db import read_session, write_session
+from project_dm.models import Job
 from project_dm.repositories.brands import list_brands, upsert_brand
 from project_dm.repositories.dashboard import (
     dashboard_stats,
@@ -44,12 +45,16 @@ from project_dm.repositories.service_controls import (
 from project_dm.schemas import JobStatus
 from project_dm.workers.listing import run_one_listing_job
 from project_dm.workers.product import run_product_jobs
-from project_dm.workers.reviews import run_one_review_job
+from project_dm.workers.reviews import (
+    apply_review_payload,
+    run_one_review_job,
+)
 from project_dm.workers.supervisor import (
     SCRAPER_LANE_COUNT,
     start_worker_supervisors,
     stop_worker_supervisors,
 )
+from project_dm.scraping.reviews import build_reviews_url
 
 
 PACKAGE_DIR = Path(__file__).parent
@@ -317,6 +322,69 @@ def job_diagnostics(job_id: int) -> JSONResponse:
                     pass
         files.append(entry)
     return JSONResponse({"job_id": job_id, "files": files})
+
+
+@app.get("/jobs/{job_id}/solve", response_class=HTMLResponse)
+def solve_job(request: Request, job_id: int) -> HTMLResponse:
+    with read_session() as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.family_id is None or not job.target_url:
+            raise HTTPException(
+                status_code=400, detail="Job is missing review metadata"
+            )
+        review_limit = (
+            job.total_expected
+            or job.current_offset
+            or 10
+        )
+        review_url = build_reviews_url(
+            job.target_url,
+            offset=job.current_offset,
+            limit=review_limit,
+        )
+    return templates.TemplateResponse(
+        request,
+        "solve_review.html",
+        _context(
+            request,
+            active="jobs",
+            job=job,
+            review_url=review_url,
+            review_limit=review_limit,
+        ),
+    )
+
+
+@app.post("/jobs/{job_id}/solve")
+def submit_solved_review(job_id: int, payload: dict[str, object]) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id, with_for_update=True)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.family_id is None:
+            raise HTTPException(
+                status_code=400, detail="Job is missing family metadata"
+            )
+        reviews_seen, _, checkpoint_status = apply_review_payload(
+            session,
+            job_id=job.id,
+            family_id=job.family_id,
+            payload=payload,
+        )
+        if checkpoint_status is JobStatus.COMPLETED:
+            message = f"Manual solve imported {reviews_seen} reviews and completed the job."
+        else:
+            message = f"Manual solve imported {reviews_seen} reviews."
+        if checkpoint_status is not JobStatus.COMPLETED:
+            set_job_status(session, job_id, JobStatus.PENDING)
+        print(
+            f"[web] submit_solved_review job_id={job_id} reviews_seen={reviews_seen} status={checkpoint_status} message={message}",
+            file=sys.stderr,
+            flush=True,
+        )
+    return RedirectResponse("/jobs", status_code=303)
 
 
 @app.post("/brands")

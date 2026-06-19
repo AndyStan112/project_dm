@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Solve Review CAPTCHA · Project DM{% endblock %}
+{% block heading %}Solve review challenge{% endblock %}
+{% block eyebrow %}Human-assisted review fetch{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/jobs">Back to jobs</a>
+{% endblock %}
+{% block content %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Target</p><h2>Use your browser to clear the challenge</h2></div>
+    <span class="panel-tag">job #{{ job.id }}</span>
+  </div>
+  <p class="hint">Open the review endpoint below, solve the challenge if it appears, then click fetch.</p>
+  <p><a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Open review endpoint</a></p>
+  <p class="hint" id="solve-status">Ready.</p>
+  <input type="hidden" id="review-url" value="{{ review_url }}">
+  <button class="button" id="fetch-button" type="button">Fetch reviews from this browser</button>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const reviewUrl = document.getElementById("review-url").value;
+  const status = document.getElementById("solve-status");
+  const button = document.getElementById("fetch-button");
+
+  const setStatus = (message) => {
+    status.textContent = message;
+  };
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    setStatus("Fetching from your browser session...");
+    try {
+      const response = await fetch(reviewUrl, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const bodyText = await response.text();
+      if (!response.ok) {
+        setStatus(`Remote returned HTTP ${response.status}. Open the review endpoint, solve the challenge, and try again.`);
+        button.disabled = false;
+        return;
+      }
+      if (!contentType.includes("application/json")) {
+        setStatus("The browser received a non-JSON response. Solve the challenge in the opened tab, then try again.");
+        button.disabled = false;
+        return;
+      }
+      const payload = JSON.parse(bodyText);
+      const submit = await fetch(window.location.pathname, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!submit.ok) {
+        setStatus(`Could not save the response: HTTP ${submit.status}`);
+        button.disabled = false;
+        return;
+      }
+      window.location.href = "/jobs";
+    } catch (error) {
+      console.error(error);
+      setStatus(`Fetch failed: ${error}`);
+      button.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

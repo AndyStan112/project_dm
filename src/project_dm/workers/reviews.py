@@ -89,6 +89,40 @@ def _response_error_message(
     )
 
 
+def apply_review_payload(
+    session,
+    *,
+    job_id: int,
+    family_id: int,
+    payload: dict[str, object],
+) -> tuple[int, int, JobStatus]:
+    review_page = parse_review_page(payload)
+    for review in review_page.reviews:
+        variant_id = find_variant_id(
+            session,
+            family_id=family_id,
+            pnk=review.pnk,
+        )
+        values = review.model_dump(exclude={"pnk"})
+        upsert_review(
+            session,
+            ReviewCreate(
+                family_id=family_id,
+                variant_id=variant_id,
+                **values,
+            ),
+        )
+    checkpoint = checkpoint_review_page(
+        session,
+        job_id=job_id,
+        reviews_seen=len(review_page.reviews),
+        total_expected=review_page.total_count,
+    )
+    return len(review_page.reviews), checkpoint.current_offset, JobStatus(
+        checkpoint.status
+    )
+
+
 def run_one_review_job(
     *,
     max_pages: int | None = 1,
@@ -328,34 +362,18 @@ def run_one_review_job(
                 )
 
             payload = json.loads(response_body)
-            review_page = parse_review_page(payload)
             with write_session() as session, session.begin():
-                for review in review_page.reviews:
-                    variant_id = find_variant_id(
+                reviews_seen, offset, checkpoint_status = (
+                    apply_review_payload(
                         session,
+                        job_id=job_id,
                         family_id=family_id,
-                        pnk=review.pnk,
+                        payload=payload,
                     )
-                    values = review.model_dump(exclude={"pnk"})
-                    upsert_review(
-                        session,
-                        ReviewCreate(
-                            family_id=family_id,
-                            variant_id=variant_id,
-                            **values,
-                        ),
-                    )
-                checkpoint = checkpoint_review_page(
-                    session,
-                    job_id=job_id,
-                    reviews_seen=len(review_page.reviews),
-                    total_expected=review_page.total_count,
                 )
-                checkpoint_status = JobStatus(checkpoint.status)
-                offset = checkpoint.current_offset
 
             pages_processed += 1
-            reviews_upserted += len(review_page.reviews)
+            reviews_upserted += reviews_seen
             if checkpoint_status is JobStatus.COMPLETED:
                 return ReviewRunResult(
                     job_id=job_id,
