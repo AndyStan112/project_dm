@@ -24,4 +24,4 @@ RUN uv run playwright install --with-deps chromium
 
 EXPOSE 8000
 
-CMD ["uv", "run", "project-dm-web"]
+CMD ["uv", "run", "serve"]
