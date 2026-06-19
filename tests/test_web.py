@@ -63,3 +63,12 @@ def test_pending_job_can_be_promoted() -> None:
     client = TestClient(app)
     response = client.post("/jobs/1/promote", follow_redirects=False)
     assert response.status_code in {303, 404}
+
+
+def test_job_can_be_marked_unrecoverable() -> None:
+    if not os.getenv("DATABASE_URL_WRITE"):
+        pytest.skip("DATABASE_URL_WRITE is not configured")
+
+    client = TestClient(app)
+    response = client.post("/jobs/1/unrecoverable", follow_redirects=False)
+    assert response.status_code in {303, 404}

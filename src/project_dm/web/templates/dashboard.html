@@ -61,7 +61,7 @@
           {% if job.target_url %}
           <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
           {% endif %}
-          <a class="button" href="/jobs/{{ job.id }}/solve">Solve captcha</a>
+          <form method="post" action="/jobs/{{ job.id }}/unrecoverable"><button class="button danger-button" type="submit">Unrecoverable</button></form>
           <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
           <form method="post" action="/jobs/{{ job.id }}/resume"><button type="submit">Resume</button></form>
         </div>
@@ -243,7 +243,7 @@
         </div>
         <div class="blocked-actions">
           <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
-          <a class="button" href="/jobs/${encodeURIComponent(job.id)}/solve">Solve captcha</a>
+          <form method="post" action="/jobs/${encodeURIComponent(job.id)}/unrecoverable"><button class="button danger-button" type="submit">Unrecoverable</button></form>
           ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}" target="_blank" rel="noreferrer">Open target</a>` : ""}
           <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>
           <form method="post" action="/jobs/${encodeURIComponent(job.id)}/resume"><button type="submit">Resume</button></form>

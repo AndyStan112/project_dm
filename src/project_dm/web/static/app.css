@@ -39,6 +39,7 @@ h2 { margin: 2px 0 0; font-size: 18px; letter-spacing: -.02em; }
 .button:hover { filter: brightness(.94); }
 .button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid rgba(20,107,74,.25); outline-offset: 2px; }
 .button.secondary { color: var(--green); background: var(--green-soft); }
+.button.danger-button { color: white; background: var(--red); }
 .button.ghost { color: var(--muted); background: transparent; border: 1px solid var(--line); }
 .button, button, input, select { min-height: 44px; }
 .metric-grid { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }

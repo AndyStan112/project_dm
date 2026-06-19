@@ -4,6 +4,7 @@ import threading
 import sys
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
@@ -310,6 +311,7 @@ def control_job(job_id: int, action: str) -> RedirectResponse:
         "resume": JobStatus.PENDING,
         "retry": JobStatus.PENDING,
         "skip": JobStatus.SKIPPED,
+        "unrecoverable": JobStatus.FAILED,
     }
     status = actions.get(action)
     with write_session() as session, session.begin():
@@ -321,6 +323,10 @@ def control_job(job_id: int, action: str) -> RedirectResponse:
             raise HTTPException(status_code=400, detail="Unsupported job action")
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
+        if action == "unrecoverable":
+            job.last_error = job.last_error or "Marked unrecoverable by user."
+            job.finished_at = datetime.now(UTC)
+            session.flush()
         print(
             f"[web] control_job updated job_id={job_id} status={job.status}",
             file=sys.stderr,

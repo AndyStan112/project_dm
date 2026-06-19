@@ -23,15 +23,15 @@
           <form method="post" action="/jobs/{{ job.id }}/pause"><button>Pause</button></form>
           {% elif job.status in ["paused", "blocked", "failed"] %}
           <form method="post" action="/jobs/{{ job.id }}/resume"><button>Resume</button></form>
-          {% if job.job_type == "reviews" %}
-          <a class="text-link" href="/jobs/{{ job.id }}/solve">Solve captcha</a>
-          {% endif %}
           <a class="text-link" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
           {% elif job.status == "pending" %}
           <form method="post" action="/jobs/{{ job.id }}/pause"><button>Pause</button></form>
           <form method="post" action="/jobs/{{ job.id }}/promote"><button>Promote</button></form>
           {% endif %}
           {% if job.status not in ["completed", "skipped"] %}
+          {% if job.status in ["blocked", "failed"] %}
+          <form method="post" action="/jobs/{{ job.id }}/unrecoverable"><button class="danger-button">Unrecoverable</button></form>
+          {% endif %}
           <form method="post" action="/jobs/{{ job.id }}/skip"><button class="danger-link">Skip</button></form>
           {% endif %}
         </td>
