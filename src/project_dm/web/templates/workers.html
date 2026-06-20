@@ -4,6 +4,7 @@
 {% block eyebrow %}Service management{% endblock %}
 {% block actions %}
   <a class="button secondary" href="/jobs">Open queue</a>
+  <a class="button secondary" href="/captcha">Open captcha</a>
 {% endblock %}
 {% block content %}
 <section class="panel notice-panel">
@@ -39,7 +40,7 @@
         <p>{{ job.last_error or "No error message recorded." }}</p>
       </div>
       <div class="blocked-actions">
-        <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+        <a class="button" href="{% if job.job_type == 'reviews' %}/captcha/review/{{ job.id }}{% elif job.job_type == 'product' %}/captcha/product/{{ job.id }}{% else %}/captcha/brand/{{ job.id }}{% endif %}" target="_blank" rel="noreferrer">Open captcha</a>
         {% if job.target_url %}
         <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
         {% endif %}
@@ -118,7 +119,7 @@
       </form>
       <form method="post" action="/workers/reviews/queue-missing"><button class="button">Continue review backlog</button></form>
     </div>
-    <p class="hint">Review runs always fetch the full remaining review set in one shot. The scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>
+    <p class="hint">Use the captcha workbench for the linear mobile flow. These buttons still run the worker directly, while the scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>
   </article>
 </section>
 {% endblock %}

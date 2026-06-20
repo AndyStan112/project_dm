@@ -57,7 +57,7 @@
           <p>{{ job.last_error or "No error message recorded." }}</p>
         </div>
         <div class="blocked-actions">
-          <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+          <a class="button" href="{% if job.job_type == 'reviews' %}/captcha/review/{{ job.id }}{% elif job.job_type == 'product' %}/captcha/product/{{ job.id }}{% else %}/captcha/brand/{{ job.id }}{% endif %}" target="_blank" rel="noreferrer">Open captcha</a>
           {% if job.target_url %}
           <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
           {% endif %}
@@ -241,8 +241,8 @@
           <small>${escapeHtml(job.family_name || job.brand_slug || "Unassigned")}</small>
           <p>${escapeHtml(job.last_error || "No error message recorded.")}</p>
         </div>
-        <div class="blocked-actions">
-          <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+          <div class="blocked-actions">
+          <a class="button" href="${job.job_type === 'reviews' ? `/captcha/review/${encodeURIComponent(job.id)}` : job.job_type === 'product' ? `/captcha/product/${encodeURIComponent(job.id)}` : `/captcha/brand/${encodeURIComponent(job.id)}`}" target="_blank" rel="noreferrer">Open captcha</a>
           <form method="post" action="/jobs/${encodeURIComponent(job.id)}/unrecoverable"><button class="button danger-button" type="submit">Unrecoverable</button></form>
           ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}" target="_blank" rel="noreferrer">Open target</a>` : ""}
           <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>

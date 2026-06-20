@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Captcha · Project DM{% endblock %}
+{% block heading %}Captcha workbench{% endblock %}
+{% block eyebrow %}Linear human intervention{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/jobs">Jobs</a>
+  <a class="button secondary" href="/workers">Workers</a>
+{% endblock %}
+{% block content %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Workflow</p>
+      <h2>Pick a lane and move one item at a time</h2>
+    </div>
+    <span class="panel-tag">{{ title }}</span>
+  </div>
+  <div class="captcha-tabs">
+    <a class="captcha-tab {{ 'active' if kind == 'brand' else '' }}" href="/captcha/brand">Brand <small>{{ counts.brand if counts is defined else '' }}</small></a>
+    <a class="captcha-tab {{ 'active' if kind == 'product' else '' }}" href="/captcha/product">Product <small>{{ counts.product if counts is defined else '' }}</small></a>
+    <a class="captcha-tab {{ 'active' if kind == 'review' else '' }}" href="/captcha/review">Review <small>{{ counts.review if counts is defined else '' }}</small></a>
+  </div>
+  <p class="hint">This page always shows the exact job we want you to handle next. The open link points at the correct target for that job, so there is no guessing or mismatch between cards and browser tabs.</p>
+</section>
+
+{% if not kind %}
+<section class="two-column">
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Brand</p><h2>Seed a brand queue</h2></div>
+    </div>
+    <p class="hint">Add a brand slug or URL and we will create or resume its listing job.</p>
+    <a class="button" href="/captcha/brand">Open brand lane</a>
+  </article>
+  <article class="panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Product</p><h2>Walk product jobs one by one</h2></div>
+    </div>
+    <p class="hint">Show the next discovered product job and open its exact target URL.</p>
+    <a class="button" href="/captcha/product">Open product lane</a>
+  </article>
+</section>
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Review</p><h2>Handle review jobs with browser capture</h2></div>
+  </div>
+  <p class="hint">Open the exact review URL, solve the challenge, fetch the JSON, and move straight to the next job.</p>
+  <a class="button" href="/captcha/review">Open review lane</a>
+</section>
+{% endif %}
+
+{% if kind == "brand" %}
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Brand</p><h2>Start a brand listing queue</h2></div>
+    <span class="panel-tag">{{ "active" if job_row else "idle" }}</span>
+  </div>
+  <form class="filter-form" method="post" action="/captcha/brand">
+    <label>Brand name or URL<input name="brand" value="{{ brand_value or '' }}" placeholder="Apple or https://www.emag.ro/.../brand/apple/c"></label>
+    <button class="button" type="submit">Load brand</button>
+  </form>
+  {% if job_row %}
+  <div class="captcha-card">
+    <div>
+      <p class="eyebrow">Current item</p>
+      <h2>#{{ job.id }} {{ job.job_type }}</h2>
+      <p class="hint">{{ job_row.brand_slug or job_row.family_name or "Unassigned" }}</p>
+      <p class="hint">{{ job.target_url or "No target URL" }}</p>
+    </div>
+    <div class="captcha-actions">
+      {% if open_url %}
+      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
+      {% endif %}
+      <a class="button secondary" href="/captcha/brand">Next brand</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">Submit a brand to queue its listing job.</div>
+  {% endif %}
+</section>
+{% elif kind == "product" %}
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Product</p><h2>Continue discovered product jobs</h2></div>
+    <a class="text-link" href="/captcha/product">Refresh</a>
+  </div>
+  {% if job_row %}
+  <div class="captcha-card">
+    <div>
+      <p class="eyebrow">Current item</p>
+      <h2>#{{ job.id }} {{ job.job_type }}</h2>
+      <p class="hint">{{ job_row.brand_slug or job_row.family_name or "Unassigned" }}</p>
+      <p class="hint">{{ job.target_url or "No target URL" }}</p>
+      <p class="hint">Attempts: {{ job.attempts }} · Status: {{ job.status }}</p>
+    </div>
+    <div class="captcha-actions">
+      {% if open_url %}
+      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
+      {% endif %}
+      <a class="button secondary" href="/captcha/product">Next product</a>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">No actionable product jobs right now.</div>
+  {% endif %}
+</section>
+{% elif kind == "review" %}
+<section class="panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Review</p><h2>Continue discovered review jobs</h2></div>
+    <a class="text-link" href="/captcha/review">Refresh</a>
+  </div>
+  {% if job_row %}
+  <div class="captcha-card">
+    <div>
+      <p class="eyebrow">Current item</p>
+      <h2>#{{ job.id }} {{ job.job_type }}</h2>
+      <p class="hint">{{ job_row.brand_slug or job_row.family_name or "Unassigned" }}</p>
+      <p class="hint">{{ job.target_url or "No target URL" }}</p>
+      <p class="hint">Offset: {{ job.current_offset }}{% if job.total_expected is not none %} / {{ job.total_expected }}{% endif %} · Attempts: {{ job.attempts }}</p>
+    </div>
+    <div class="captcha-actions">
+      {% if open_url %}
+      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open exact review URL</a>
+      {% endif %}
+      <button class="button secondary" id="fetch-button" type="button">Fetch from browser</button>
+      <a class="button ghost" href="/captcha/review">Next review</a>
+    </div>
+  </div>
+  <p class="hint" id="solve-status">Open the exact review URL, solve the CAPTCHA if it appears, then fetch the JSON back here.</p>
+  <input type="hidden" id="open-url" value="{{ open_url or '' }}">
+  <form id="review-form" method="post" action="/captcha/review/{{ job.id }}" class="hidden"></form>
+  {% else %}
+  <div class="empty-state">No actionable review jobs right now.</div>
+  {% endif %}
+{% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+{% if kind == "review" and job_row and open_url %}
+<script>
+(function () {
+  const reviewUrl = document.getElementById("open-url").value;
+  const status = document.getElementById("solve-status");
+  const button = document.getElementById("fetch-button");
+  const formAction = document.getElementById("review-form").action;
+
+  const setStatus = (message) => {
+    status.textContent = message;
+  };
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    setStatus("Fetching from your browser session...");
+    try {
+      const response = await fetch(reviewUrl, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const bodyText = await response.text();
+      if (!response.ok) {
+        setStatus(`Remote returned HTTP ${response.status}. Open the exact review URL, solve the challenge, and try again.`);
+        button.disabled = false;
+        return;
+      }
+      if (!contentType.includes("application/json")) {
+        setStatus("The browser received a non-JSON response. Solve the challenge in the opened tab, then try again.");
+        button.disabled = false;
+        return;
+      }
+      const payload = JSON.parse(bodyText);
+      const submit = await fetch(formAction, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!submit.ok) {
+        setStatus(`Could not save the response: HTTP ${submit.status}`);
+        button.disabled = false;
+        return;
+      }
+      await window.ProjectDMPWA.notify("Reviews imported", {
+        body: "The captured review payload was saved successfully.",
+      });
+      window.location.href = "/captcha/review";
+    } catch (error) {
+      console.error(error);
+      setStatus(`Fetch failed: ${error}`);
+      button.disabled = false;
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

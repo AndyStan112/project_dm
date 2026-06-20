@@ -114,6 +114,14 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .empty-state { padding: 45px; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 12px; background: white; }
 .notice-panel { border-left: 4px solid var(--orange); }
 .notice-panel code { padding: 1px 4px; border-radius: 4px; background: #f4efe7; }
+.captcha-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 0; }
+.captcha-tab { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: white; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 800; color: var(--muted); }
+.captcha-tab small { color: var(--green); font-size: 11px; }
+.captcha-tab.active { color: var(--green); border-color: rgba(20,107,74,.25); background: var(--green-soft); }
+.captcha-card { margin-top: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: var(--shadow); display: grid; gap: 14px; }
+.captcha-card h2 { margin-top: 6px; }
+.captcha-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.captcha-actions .button { flex: 1 1 220px; }
 .alert-list { display: grid; gap: 12px; }
 .blocked-card { padding: 16px; border: 1px solid #f1d1c3; border-radius: 10px; background: #fff7f2; display: grid; gap: 12px; }
 .blocked-card strong { display: block; margin-bottom: 4px; }
@@ -125,9 +133,10 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .checkbox-label input { min-width: auto; margin: 0; }
 .workers-grid .status-tile strong { font-size: 16px; }
 .workers-grid .status-tile small { text-transform: none; }
+.hidden { display: none; }
 @media (max-width: 1050px) {
   .app-shell { grid-template-columns: 84px minmax(0,1fr); }.sidebar { padding-inline: 14px; }.brand-mark span:last-child, nav span, nav kbd, .sidebar-note div { display: none; }.brand-mark { margin-inline: 6px; }.sidebar-note { justify-content: center; }
-  .metric-grid { grid-template-columns: repeat(2, 1fr); }.product-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }.product-grid { grid-template-columns: repeat(2, 1fr); }.captcha-tabs { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   .app-shell { display: block; }.sidebar { position: static; width: 100%; height: auto; padding: 12px; flex-direction: row; align-items: center; overflow-x: auto; }.brand-mark { margin: 0 8px 0 0; }.brand-icon { width: 36px; height: 36px; }nav { display: flex; }.sidebar-note { display: none; }

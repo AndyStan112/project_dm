@@ -30,6 +30,11 @@
       "name": "Jobs",
       "short_name": "Jobs",
       "url": "/jobs"
+    },
+    {
+      "name": "Captcha",
+      "short_name": "Captcha",
+      "url": "/captcha"
     }
   ]
 }

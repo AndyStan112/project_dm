@@ -20,7 +20,7 @@ pytestmark = pytest.mark.skipif(
 def test_dashboard_pages_render() -> None:
     client = TestClient(app)
 
-    for path in ("/", "/jobs", "/workers", "/products", "/reviews"):
+    for path in ("/", "/jobs", "/workers", "/products", "/reviews", "/captcha"):
         response = client.get(path)
         assert response.status_code == 200
         assert "Project DM" in response.text

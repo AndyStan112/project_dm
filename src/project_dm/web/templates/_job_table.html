@@ -23,7 +23,7 @@
           <form method="post" action="/jobs/{{ job.id }}/pause"><button>Pause</button></form>
           {% elif job.status in ["paused", "blocked", "failed"] %}
           <form method="post" action="/jobs/{{ job.id }}/resume"><button>Resume</button></form>
-          <a class="text-link" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+          <a class="text-link" href="{% if job.job_type == 'reviews' %}/captcha/review/{{ job.id }}{% elif job.job_type == 'product' %}/captcha/product/{{ job.id }}{% else %}/captcha/brand/{{ job.id }}{% endif %}" target="_blank" rel="noreferrer">Open captcha</a>
           {% elif job.status == "pending" %}
           <form method="post" action="/jobs/{{ job.id }}/pause"><button>Pause</button></form>
           <form method="post" action="/jobs/{{ job.id }}/promote"><button>Promote</button></form>

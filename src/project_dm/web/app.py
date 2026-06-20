@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
+from urllib.parse import quote_plus
 
 import uvicorn
 from fastapi import Body, FastAPI, Form, HTTPException, Request
@@ -15,6 +16,7 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import case, func, select
 
 from project_dm.brands import normalize_brand
 from project_dm.db import read_session, write_session
@@ -44,7 +46,7 @@ from project_dm.repositories.service_controls import (
     list_service_controls,
     set_service_control_desired_state,
 )
-from project_dm.schemas import JobStatus
+from project_dm.schemas import JobStatus, JobType
 from project_dm.workers.listing import run_one_listing_job
 from project_dm.workers.product import run_product_jobs
 from project_dm.workers.reviews import (
@@ -64,6 +66,18 @@ templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
 STATIC_DIR = PACKAGE_DIR / "static"
 DIAGNOSTICS_DIR = Path("data") / "diagnostics"
 DEFAULT_BROWSER_PUBLIC_URL = "https://vnc.windogs.win"
+CAPTCHA_JOB_TYPES = {
+    "brand": JobType.BRAND_LISTING,
+    "product": JobType.PRODUCT,
+    "review": JobType.REVIEWS,
+}
+CAPTCHA_ACTIONABLE_STATUSES = (
+    JobStatus.PENDING,
+    JobStatus.RUNNING,
+    JobStatus.PAUSED,
+    JobStatus.BLOCKED,
+    JobStatus.FAILED,
+)
 
 app = FastAPI(title="Project DM Dashboard")
 app.mount(
@@ -150,6 +164,90 @@ def _browser_public_url() -> str:
     if value:
         return value.rstrip("/")
     return DEFAULT_BROWSER_PUBLIC_URL
+
+
+def _captcha_kind_label(kind: str) -> str:
+    return {
+        "brand": "Brand",
+        "product": "Product",
+        "review": "Review",
+    }[kind]
+
+
+def _captcha_job_type(kind: str) -> JobType:
+    job_type = CAPTCHA_JOB_TYPES.get(kind)
+    if job_type is None:
+        raise HTTPException(status_code=404, detail="Unknown captcha page")
+    return job_type
+
+
+def _job_progress_url(job: Job, session) -> str | None:
+    if job.target_url is None:
+        return None
+    if job.job_type != JobType.REVIEWS.value:
+        return job.target_url
+
+    family = session.get(ProductFamily, job.family_id) if job.family_id else None
+    limit = max(
+        (
+            job.total_expected
+            or (family.review_count if family is not None else None)
+            or 10
+        )
+        - job.current_offset,
+        1,
+    )
+    return build_reviews_url(
+        job.target_url,
+        offset=job.current_offset,
+        limit=limit,
+    )
+
+
+def _captcha_job_row(session, job: Job) -> dict[str, object]:
+    row = session.execute(
+        select(Brand.slug, ProductFamily.name)
+        .select_from(Job)
+        .outerjoin(Brand, Brand.id == Job.brand_id)
+        .outerjoin(ProductFamily, ProductFamily.id == Job.family_id)
+        .where(Job.id == job.id)
+    ).one()
+    brand_slug, family_name = row
+    return {
+        "job": job,
+        "brand_slug": brand_slug,
+        "family_name": family_name,
+        "open_url": _job_progress_url(job, session),
+    }
+
+
+def _next_captcha_job(session, kind: str) -> Job | None:
+    job_type = _captcha_job_type(kind)
+    status_rank = case(
+        (Job.status == JobStatus.PENDING.value, 0),
+        (Job.status == JobStatus.RUNNING.value, 1),
+        (Job.status == JobStatus.PAUSED.value, 2),
+        (Job.status == JobStatus.BLOCKED.value, 3),
+        (Job.status == JobStatus.FAILED.value, 4),
+        else_=5,
+    )
+    return session.scalar(
+        select(Job)
+        .where(
+            Job.job_type == job_type.value,
+            Job.status.in_(status.value for status in CAPTCHA_ACTIONABLE_STATUSES),
+        )
+        .order_by(status_rank, Job.priority.asc(), Job.updated_at.asc())
+        .limit(1)
+    )
+
+
+def _activate_captcha_job(session, job: Job) -> Job:
+    if job.status != JobStatus.RUNNING.value:
+        job.status = JobStatus.RUNNING.value
+        job.locked_at = datetime.now(UTC)
+        session.flush()
+    return job
 
 
 def _static_text_response(filename: str, media_type: str) -> Response:
@@ -369,39 +467,197 @@ def browser_session(request: Request) -> RedirectResponse:
     )
 
 
-@app.get("/jobs/{job_id}/solve", response_class=HTMLResponse)
-def solve_job(request: Request, job_id: int) -> HTMLResponse:
+@app.get("/captcha", response_class=HTMLResponse)
+def captcha_home(request: Request) -> HTMLResponse:
+    with read_session() as session:
+        counts = {
+            kind: session.scalar(
+                select(func.count())
+                .select_from(Job)
+                .where(
+                    Job.job_type == job_type.value,
+                    Job.status.in_(
+                        status.value for status in CAPTCHA_ACTIONABLE_STATUSES
+                    ),
+                )
+            )
+            or 0
+            for kind, job_type in CAPTCHA_JOB_TYPES.items()
+        }
+    return templates.TemplateResponse(
+        request,
+        "captcha.html",
+        _context(
+            request,
+            active="captcha",
+            kind="",
+            title="Overview",
+            counts=counts,
+        ),
+    )
+
+
+def _render_captcha_job(
+    request: Request,
+    *,
+    kind: str,
+    job_id: int | None = None,
+    brand: str | None = None,
+) -> HTMLResponse:
+    job_type = _captcha_job_type(kind)
+    with read_session() as session:
+        if kind == "brand" and brand:
+            from project_dm.brands import normalize_brand
+
+            data = normalize_brand(brand)
+            with write_session() as write, write.begin():
+                record = upsert_brand(write, data)
+                job, _ = get_or_create_brand_listing_job(
+                    write,
+                    brand_id=record.id,
+                    target_url=record.listing_url,
+                )
+                if job.status != JobStatus.RUNNING.value:
+                    job.status = JobStatus.RUNNING.value
+                    job.locked_at = datetime.now(UTC)
+                write.flush()
+                row = _captcha_job_row(write, job)
+            return templates.TemplateResponse(
+                request,
+                "captcha.html",
+                _context(
+                    request,
+                    active="captcha",
+                    kind=kind,
+                    title="Brand",
+                    job=row["job"],
+                    job_row=row,
+                    open_url=row["open_url"],
+                    next_url="/captcha/brand",
+                    brand_value=brand,
+                ),
+            )
+
+        job: Job | None = None
+        if job_id is not None:
+            job = session.get(Job, job_id)
+            if job is None:
+                raise HTTPException(status_code=404, detail="Job not found")
+            if job.job_type != job_type.value:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Job type does not match captcha page",
+                )
+        else:
+            job = _next_captcha_job(session, kind)
+        if job is not None:
+            job = _activate_captcha_job(session, job)
+            row = _captcha_job_row(session, job)
+        else:
+            row = None
+    return templates.TemplateResponse(
+        request,
+        "captcha.html",
+        _context(
+            request,
+            active="captcha",
+            kind=kind,
+            title=_captcha_kind_label(kind),
+            job=row["job"] if row else None,
+            job_row=row,
+            open_url=row["open_url"] if row else None,
+            next_url=f"/captcha/{kind}",
+            brand_value=brand or "",
+        ),
+    )
+
+
+@app.get("/captcha/brand", response_class=HTMLResponse)
+def captcha_brand(
+    request: Request,
+    brand: str = "",
+    job_id: int | None = None,
+) -> HTMLResponse:
+    return _render_captcha_job(
+        request,
+        kind="brand",
+        job_id=job_id,
+        brand=brand or None,
+    )
+
+
+@app.get("/captcha/brand/{job_id}", response_class=HTMLResponse)
+def captcha_brand_job(
+    request: Request,
+    job_id: int,
+) -> HTMLResponse:
+    return _render_captcha_job(request, kind="brand", job_id=job_id)
+
+
+@app.post("/captcha/brand")
+def submit_captcha_brand(
+    brand: Annotated[str, Form(min_length=1)],
+) -> RedirectResponse:
+    return RedirectResponse(
+        f"/captcha/brand?brand={quote_plus(brand)}",
+        status_code=303,
+    )
+
+
+@app.get("/captcha/product", response_class=HTMLResponse)
+def captcha_product(
+    request: Request,
+    job_id: int | None = None,
+) -> HTMLResponse:
+    return _render_captcha_job(request, kind="product", job_id=job_id)
+
+
+@app.get("/captcha/product/{job_id}", response_class=HTMLResponse)
+def captcha_product_job(
+    request: Request,
+    job_id: int,
+) -> HTMLResponse:
+    return _render_captcha_job(request, kind="product", job_id=job_id)
+
+
+@app.get("/captcha/review", response_class=HTMLResponse)
+def captcha_review(
+    request: Request,
+    job_id: int | None = None,
+) -> HTMLResponse:
+    return _render_captcha_job(request, kind="review", job_id=job_id)
+
+
+@app.get("/jobs/{job_id}/solve")
+def solve_job(request: Request, job_id: int) -> RedirectResponse:
+    return RedirectResponse(f"/captcha/review?job_id={job_id}", status_code=303)
+
+
+@app.get("/captcha/review/{job_id}", response_class=HTMLResponse)
+def captcha_review_job(request: Request, job_id: int) -> HTMLResponse:
     with read_session() as session:
         job = session.get(Job, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
-        if job.family_id is None or not job.target_url:
+        if job.job_type != JobType.REVIEWS.value:
             raise HTTPException(
-                status_code=400, detail="Job is missing review metadata"
+                status_code=400,
+                detail="Job type does not match captcha page",
             )
-        family = session.get(ProductFamily, job.family_id)
-        review_limit = max(
-            (
-                job.total_expected
-                or (family.review_count if family is not None else None)
-                or 10
-            ) - job.current_offset,
-            1,
-        )
-        review_url = build_reviews_url(
-            job.target_url,
-            offset=job.current_offset,
-            limit=review_limit,
-        )
+        job = _activate_captcha_job(session, job)
+        row = _captcha_job_row(session, job)
     return templates.TemplateResponse(
         request,
-        "solve_review.html",
+        "captcha.html",
         _context(
             request,
-            active="jobs",
-            job=job,
-            review_url=review_url,
-            review_limit=review_limit,
+            active="captcha",
+            kind="review",
+            title="Review",
+            job=row["job"],
+            job_row=row,
+            open_url=row["open_url"],
+            next_url="/captcha/review",
         ),
     )
 
@@ -410,6 +666,21 @@ def solve_job(request: Request, job_id: int) -> HTMLResponse:
 def submit_solved_review(
     job_id: int,
     payload: dict[str, object] = Body(...),
+) -> RedirectResponse:
+    return _submit_review_payload(job_id, payload)
+
+
+@app.post("/captcha/review/{job_id}")
+def submit_captcha_review(
+    job_id: int,
+    payload: dict[str, object] = Body(...),
+) -> RedirectResponse:
+    return _submit_review_payload(job_id, payload)
+
+
+def _submit_review_payload(
+    job_id: int,
+    payload: dict[str, object],
 ) -> RedirectResponse:
     with write_session() as session, session.begin():
         job = session.get(Job, job_id, with_for_update=True)
@@ -436,7 +707,7 @@ def submit_solved_review(
             file=sys.stderr,
             flush=True,
         )
-    return RedirectResponse("/jobs", status_code=303)
+    return RedirectResponse("/captcha/review", status_code=303)
 
 
 @app.post("/brands")
