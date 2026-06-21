@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
 from urllib.parse import quote_plus
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
 
 import uvicorn
 from fastapi import Body, FastAPI, Form, HTTPException, Request
@@ -664,6 +662,7 @@ def captcha_product_job(
 def captcha_review(
     request: Request,
     job_id: int | None = None,
+    marked: int | None = None,
 ) -> HTMLResponse:
     return _render_captcha_job(request, kind="review", job_id=job_id)
 
@@ -722,26 +721,6 @@ def open_captcha_review(job_id: int) -> RedirectResponse:
         review_url = row["open_url"]
         if not review_url:
             raise HTTPException(status_code=400, detail="Job has no review URL")
-    try:
-        with urlopen(review_url, timeout=15) as response:
-            status = getattr(response, "status", 200)
-    except HTTPError as exc:
-        status = exc.code
-    except URLError:
-        status = None
-    if status in {404, 410}:
-        with write_session() as session, session.begin():
-            fail_job(
-                session,
-                job_id=job_id,
-                status=JobStatus.FAILED,
-                message=(
-                    f"Review URL returned HTTP {status}; marked unrecoverable."
-                ),
-            )
-        return RedirectResponse(
-            f"/captcha/review/{job_id}?stale=1", status_code=303
-        )
     return RedirectResponse(review_url, status_code=303)
 
 
@@ -752,6 +731,26 @@ def captcha_review_status(job_id: int) -> JSONResponse:
     if state is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return JSONResponse(state)
+
+
+@app.post("/captcha/review/{job_id}/unrecoverable")
+def captcha_review_unrecoverable(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.REVIEWS.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        set_job_status(session, job_id, JobStatus.FAILED)
+        job = session.get(Job, job_id)
+        if job is not None:
+            job.last_error = job.last_error or "Marked unrecoverable by user."
+            job.finished_at = datetime.now(UTC)
+            session.flush()
+    return RedirectResponse("/captcha/review?marked=1", status_code=303)
 
 
 @app.post("/jobs/{job_id}/solve")

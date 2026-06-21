@@ -132,13 +132,19 @@
       <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Open exact review URL</a>
       {% endif %}
       <button class="button secondary" id="status-button" type="button">Check progress</button>
-      <form method="post" action="/jobs/{{ job.id }}/unrecoverable">
+      <form method="post" action="/captcha/review/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
       </form>
       <a class="button ghost" href="/captcha/review">Next review</a>
     </div>
   </div>
-  <p class="hint" id="solve-status">Open the exact review URL, solve the CAPTCHA if it appears, then let the worker collect the reviews. This page polls live progress.</p>
+  <p class="hint" id="solve-status">
+    {% if marked %}
+    Review marked unrecoverable. Loading the next review.
+    {% else %}
+    Open the exact review URL, solve the CAPTCHA if it appears, then let the worker collect the reviews. This page polls live progress.
+    {% endif %}
+  </p>
   {% else %}
   <div class="empty-state">No actionable review jobs right now.</div>
   {% endif %}
