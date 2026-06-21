@@ -152,8 +152,9 @@
     </div>
     <div class="captcha-actions">
       {% if open_url %}
-      <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Open exact review URL</a>
+      <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Validate exact review URL</a>
       {% endif %}
+      <a class="button secondary" href="/browser" target="_blank" rel="noreferrer">Open server browser (VNC)</a>
       <button class="button secondary" id="status-button" type="button">Check progress</button>
       <form method="post" action="/captcha/review/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
@@ -165,7 +166,7 @@
     {% if marked %}
     Review marked unrecoverable. Loading the next review.
     {% else %}
-    Open the exact review URL, solve the CAPTCHA if it appears, then let the worker collect the reviews. This page polls live progress.
+    Validate the exact review URL in a normal tab, or open the server browser to solve the CAPTCHA there. This page polls live progress.
     {% endif %}
   </p>
   {% else %}

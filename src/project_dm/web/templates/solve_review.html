@@ -4,7 +4,7 @@
 {% block eyebrow %}Human-assisted review fetch{% endblock %}
 {% block actions %}
   <a class="button secondary" href="/jobs">Back to jobs</a>
-  <a class="button" href="/browser" target="_blank" rel="noreferrer">Open browser</a>
+  <a class="button" href="/browser" target="_blank" rel="noreferrer">Open server browser (VNC)</a>
   <button class="button secondary" type="button" onclick="ProjectDMPWA.enableNotifications().then(() => ProjectDMPWA.notify('Project DM', { body: 'Notifications are enabled.' }))">Enable notifications</button>
 {% endblock %}
 {% block content %}
@@ -16,11 +16,11 @@
   <p class="hint">This page is sized for mobile. Keep it open, solve the challenge in the remote browser, then fetch the JSON back into Project DM.</p>
   <ol class="solve-steps">
     <li><strong>Open the browser</strong> and clear any CAPTCHA that appears.</li>
-    <li><strong>Open the review endpoint</strong> if you need to verify the payload directly.</li>
+    <li><strong>Validate the review endpoint</strong> if you need to verify the payload directly.</li>
     <li><strong>Fetch all reviews</strong> when the browser session is ready.</li>
   </ol>
   <div class="solve-actions">
-    <a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Open review endpoint</a>
+    <a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Validate review endpoint</a>
     <button class="button" id="fetch-button" type="button">Fetch all reviews from this browser</button>
   </div>
   <p class="hint" id="solve-status">Ready.</p>

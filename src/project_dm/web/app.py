@@ -785,6 +785,13 @@ def open_captcha_review(job_id: int) -> RedirectResponse:
             JobStatus.PAUSED.value,
         }:
             set_job_status(session, job_id, JobStatus.PENDING)
+        # Manual browser intervention should clear any stale failure text so
+        # the mobile status view reflects the current solve attempt instead of
+        # an earlier 404/410 response.
+        job = session.get(Job, job_id)
+        if job is not None and job.last_error:
+            job.last_error = None
+            session.flush()
     return RedirectResponse(review_url, status_code=303)
 
 
