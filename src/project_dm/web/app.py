@@ -365,6 +365,7 @@ def _next_captcha_job(session, kind: str) -> Job | None:
         .where(
             Job.job_type == job_type.value,
             Job.status.in_(status.value for status in CAPTCHA_ACTIONABLE_STATUSES),
+            Job.finished_at.is_(None),
         )
         .order_by(status_rank, Job.priority.asc(), Job.updated_at.asc())
         .with_for_update(skip_locked=True)
@@ -609,6 +610,7 @@ def captcha_home(request: Request) -> HTMLResponse:
                     Job.status.in_(
                         status.value for status in CAPTCHA_ACTIONABLE_STATUSES
                     ),
+                    Job.finished_at.is_(None),
                 )
             )
             or 0
@@ -682,6 +684,8 @@ def _render_captcha_job(
                         status_code=400,
                         detail="Job type does not match captcha page",
                     )
+                if job.finished_at is not None and job.status != JobStatus.COMPLETED.value:
+                    job = None
             else:
                 job = _next_captcha_job(session, kind)
             if job is not None:
