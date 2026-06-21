@@ -406,6 +406,26 @@ def app_icon() -> Response:
     return _static_text_response("icon.svg", "image/svg+xml")
 
 
+@app.get("/pwa-debug", response_class=HTMLResponse)
+def pwa_debug(request: Request) -> HTMLResponse:
+    with read_session() as session:
+        worker_status = list_service_controls(session)
+    return templates.TemplateResponse(
+        request,
+        "pwa_debug.html",
+        _context(
+            request,
+            active="pwa_debug",
+            worker_status=worker_status,
+            manifest_url="/manifest.webmanifest",
+            sw_url="/sw.js",
+            icon_192_url="/icon-192.png",
+            icon_512_url="/icon-512.png",
+            touch_icon_url="/apple-touch-icon.png",
+        ),
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, live: str | None = None) -> HTMLResponse:
     with read_session() as session:

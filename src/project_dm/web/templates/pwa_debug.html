@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}PWA Debug · Project DM{% endblock %}
+{% block heading %}PWA debug{% endblock %}
+{% block eyebrow %}Installability check{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="/captcha">Captcha</a>
+  <a class="button secondary" href="/workers">Workers</a>
+{% endblock %}
+{% block content %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div>
+      <p class="eyebrow">Signals</p>
+      <h2>See why the browser is or is not offering install</h2>
+    </div>
+    <span class="panel-tag">PWA</span>
+  </div>
+  <p class="hint">This page shows the browser signals that matter for installability, including the manifest, service worker, display mode, and the `beforeinstallprompt` event.</p>
+  <div class="captcha-actions">
+    <button class="button" id="install-button" type="button" hidden>Install app</button>
+    <button class="button secondary" id="refresh-button" type="button">Refresh checks</button>
+  </div>
+  <div class="debug-grid">
+    <div class="debug-card">
+      <strong>Display mode</strong>
+      <p id="display-mode">Checking...</p>
+    </div>
+    <div class="debug-card">
+      <strong>Service worker</strong>
+      <p id="sw-state">Checking...</p>
+    </div>
+    <div class="debug-card">
+      <strong>Install prompt</strong>
+      <p id="prompt-state">Waiting...</p>
+    </div>
+    <div class="debug-card">
+      <strong>Manifest</strong>
+      <p id="manifest-state">Checking...</p>
+    </div>
+  </div>
+  <pre class="debug-panel" id="debug-output">Loading...</pre>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const manifestUrl = "{{ manifest_url }}";
+  const swUrl = "{{ sw_url }}";
+  const icon192Url = "{{ icon_192_url }}";
+  const icon512Url = "{{ icon_512_url }}";
+  const touchIconUrl = "{{ touch_icon_url }}";
+  const installButton = document.getElementById("install-button");
+  const refreshButton = document.getElementById("refresh-button");
+  const displayMode = document.getElementById("display-mode");
+  const swState = document.getElementById("sw-state");
+  const promptState = document.getElementById("prompt-state");
+  const manifestState = document.getElementById("manifest-state");
+  const debugOutput = document.getElementById("debug-output");
+  let deferredPrompt = null;
+  let manifestPayload = null;
+
+  const updateOutput = (payload) => {
+    debugOutput.textContent = JSON.stringify(payload, null, 2);
+  };
+
+  const updateSignals = async () => {
+    const payload = {
+      location: window.location.href,
+      standalone: window.matchMedia("(display-mode: standalone)").matches,
+      fullscreen: window.matchMedia("(display-mode: fullscreen)").matches,
+      minimalUi: window.matchMedia("(display-mode: minimal-ui)").matches,
+      navigatorStandalone: Boolean(window.navigator.standalone),
+      serviceWorkerSupported: "serviceWorker" in navigator,
+      installPromptAvailable: Boolean(deferredPrompt),
+      manifestUrl,
+      swUrl,
+      icons: [icon192Url, icon512Url, touchIconUrl],
+    };
+
+    displayMode.textContent = payload.standalone
+      ? "Standalone"
+      : payload.navigatorStandalone
+        ? "iOS home-screen mode"
+        : "Browser tab";
+
+    if ("serviceWorker" in navigator) {
+      try {
+        const ready = await navigator.serviceWorker.ready;
+        const controller = navigator.serviceWorker.controller;
+        swState.textContent = ready && ready.active
+          ? `Ready (${ready.active.state}); controller ${controller ? "present" : "missing"}`
+          : "Registered but not active";
+        payload.controller = Boolean(controller);
+        payload.scope = ready && ready.scope ? ready.scope : null;
+      } catch (error) {
+        swState.textContent = `Error: ${error}`;
+      }
+    } else {
+      swState.textContent = "Unsupported";
+    }
+
+    if (manifestPayload) {
+      const icons = Array.isArray(manifestPayload.icons) ? manifestPayload.icons : [];
+      const pngIcons = icons.filter((icon) => (icon.type || "").includes("png"));
+      manifestState.textContent = `Loaded (${icons.length} icons, ${pngIcons.length} PNG)`;
+      payload.manifest = {
+        name: manifestPayload.name || null,
+        short_name: manifestPayload.short_name || null,
+        start_url: manifestPayload.start_url || null,
+        scope: manifestPayload.scope || null,
+        display: manifestPayload.display || null,
+        icons,
+      };
+    } else {
+      manifestState.textContent = "Loading...";
+    }
+    promptState.textContent = deferredPrompt
+      ? "Browser exposed install prompt"
+      : "No prompt event yet";
+    installButton.hidden = !deferredPrompt;
+    updateOutput(payload);
+  };
+
+  const loadManifest = async () => {
+    try {
+      const response = await fetch(manifestUrl, {
+        headers: { Accept: "application/manifest+json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        manifestState.textContent = `HTTP ${response.status}`;
+        return;
+      }
+      manifestPayload = await response.json();
+      updateSignals();
+    } catch (error) {
+      manifestState.textContent = `Error: ${error}`;
+    }
+  };
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredPrompt = event;
+    updateSignals();
+  });
+
+  installButton.addEventListener("click", async () => {
+    if (!deferredPrompt) {
+      return;
+    }
+    installButton.disabled = true;
+    try {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      promptState.textContent = `User choice: ${choice.outcome}`;
+    } finally {
+      deferredPrompt = null;
+      installButton.hidden = true;
+      installButton.disabled = false;
+      updateSignals();
+    }
+  });
+
+  refreshButton.addEventListener("click", updateSignals);
+  loadManifest();
+  updateSignals();
+})();
+</script>
+{% endblock %}

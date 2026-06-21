@@ -135,6 +135,10 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .captcha-card h2 { margin-top: 6px; }
 .captcha-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .captcha-actions .button { flex: 1 1 220px; }
+.debug-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.debug-card { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #fbfcfa; display: grid; gap: 6px; }
+.debug-card strong { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--green); }
+.debug-card p { margin: 0; color: var(--ink); font-weight: 700; }
 .alert-list { display: grid; gap: 12px; }
 .blocked-card { padding: 16px; border: 1px solid #f1d1c3; border-radius: 10px; background: #fff7f2; display: grid; gap: 12px; }
 .blocked-card strong { display: block; margin-bottom: 4px; }
@@ -159,6 +163,7 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
   .topbar-actions .button, .worker-buttons .button, .blocked-actions .button, .inline-form .button, .solve-actions .button { width: 100%; }
   .inline-form label, .inline-form input, .inline-form select, .filter-form label, .filter-form input, .filter-form select { width: 100%; min-width: 0; }
   .metric-grid, .two-column, .detail-grid, .product-grid, .review-layout { grid-template-columns: 1fr; }.ratings-side { position: static; }
+  .debug-grid { grid-template-columns: 1fr; }
   .filter-form label, .filter-form input, .filter-form select { width: 100%; }.review-card { grid-template-columns: 44px 1fr; }.review-score { width: 42px; height: 42px; }
   .solve-actions { margin-top: 16px; }
 }
