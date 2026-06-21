@@ -505,23 +505,20 @@ def _render_captcha_job(
     brand: str | None = None,
 ) -> HTMLResponse:
     job_type = _captcha_job_type(kind)
-    with read_session() as session:
+    with write_session() as session:
         if kind == "brand" and brand:
             from project_dm.brands import normalize_brand
 
             data = normalize_brand(brand)
-            with write_session() as write, write.begin():
-                record = upsert_brand(write, data)
+            with session.begin():
+                record = upsert_brand(session, data)
                 job, _ = get_or_create_brand_listing_job(
-                    write,
+                    session,
                     brand_id=record.id,
                     target_url=record.listing_url,
                 )
-                if job.status != JobStatus.RUNNING.value:
-                    job.status = JobStatus.RUNNING.value
-                    job.locked_at = datetime.now(UTC)
-                write.flush()
-                row = _captcha_job_row(write, job)
+                job = _activate_captcha_job(session, job)
+                row = _captcha_job_row(session, job)
             return templates.TemplateResponse(
                 request,
                 "captcha.html",
@@ -539,22 +536,23 @@ def _render_captcha_job(
             )
 
         job: Job | None = None
-        if job_id is not None:
-            job = session.get(Job, job_id)
-            if job is None:
-                raise HTTPException(status_code=404, detail="Job not found")
-            if job.job_type != job_type.value:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Job type does not match captcha page",
-                )
-        else:
-            job = _next_captcha_job(session, kind)
-        if job is not None:
-            job = _activate_captcha_job(session, job)
-            row = _captcha_job_row(session, job)
-        else:
-            row = None
+        with session.begin():
+            if job_id is not None:
+                job = session.get(Job, job_id)
+                if job is None:
+                    raise HTTPException(status_code=404, detail="Job not found")
+                if job.job_type != job_type.value:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Job type does not match captcha page",
+                    )
+            else:
+                job = _next_captcha_job(session, kind)
+            if job is not None:
+                job = _activate_captcha_job(session, job)
+                row = _captcha_job_row(session, job)
+            else:
+                row = None
     return templates.TemplateResponse(
         request,
         "captcha.html",
@@ -635,7 +633,7 @@ def solve_job(request: Request, job_id: int) -> RedirectResponse:
 
 @app.get("/captcha/review/{job_id}", response_class=HTMLResponse)
 def captcha_review_job(request: Request, job_id: int) -> HTMLResponse:
-    with read_session() as session:
+    with write_session() as session, session.begin():
         job = session.get(Job, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
