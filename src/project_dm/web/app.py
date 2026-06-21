@@ -38,6 +38,7 @@ from project_dm.repositories.dashboard import (
 )
 from project_dm.repositories.jobs import (
     get_or_create_brand_listing_job,
+    fail_job,
     promote_job,
     queue_missing_review_jobs,
     set_job_status,

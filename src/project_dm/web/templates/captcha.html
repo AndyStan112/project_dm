@@ -209,6 +209,9 @@
         });
       }
       lastState = state;
+      if (manual) {
+        button.disabled = false;
+      }
     } catch (error) {
       console.error(error);
       if (manual) {
