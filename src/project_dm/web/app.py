@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Annotated
 from dataclasses import asdict
 from urllib.parse import quote_plus
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 import uvicorn
 from fastapi import Body, FastAPI, Form, HTTPException, Request
@@ -218,6 +220,41 @@ def _captcha_job_row(session, job: Job) -> dict[str, object]:
         "brand_slug": brand_slug,
         "family_name": family_name,
         "open_url": _job_progress_url(job, session),
+    }
+
+
+def _captcha_job_state(session, job_id: int) -> dict[str, object] | None:
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    row = _captcha_job_row(session, job)
+    total_expected = job.total_expected or 0
+    current_offset = job.current_offset
+    progress_text = (
+        f"{current_offset:,} / {total_expected:,}"
+        if total_expected
+        else f"{current_offset:,}"
+    )
+    percent = (
+        min(100, (current_offset / total_expected) * 100)
+        if total_expected
+        else 0
+    )
+    return {
+        "id": job.id,
+        "job_type": job.job_type,
+        "status": job.status,
+        "brand_slug": row["brand_slug"],
+        "family_name": row["family_name"],
+        "target_url": job.target_url,
+        "open_url": row["open_url"],
+        "current_offset": current_offset,
+        "total_expected": job.total_expected,
+        "progress_text": progress_text,
+        "progress_percent": percent,
+        "attempts": job.attempts,
+        "last_error": job.last_error,
+        "updated_at": job.updated_at.isoformat(),
     }
 
 
@@ -636,7 +673,11 @@ def solve_job(request: Request, job_id: int) -> RedirectResponse:
 
 
 @app.get("/captcha/review/{job_id}", response_class=HTMLResponse)
-def captcha_review_job(request: Request, job_id: int) -> HTMLResponse:
+def captcha_review_job(
+    request: Request,
+    job_id: int,
+    stale: int | None = None,
+) -> HTMLResponse:
     with write_session() as session, session.begin():
         job = session.get(Job, job_id)
         if job is None:
@@ -660,8 +701,56 @@ def captcha_review_job(request: Request, job_id: int) -> HTMLResponse:
             job_row=row,
             open_url=row["open_url"],
             next_url="/captcha/review",
+            stale=bool(stale),
         ),
     )
+
+
+@app.get("/captcha/review/{job_id}/open")
+def open_captcha_review(job_id: int) -> RedirectResponse:
+    with read_session() as session:
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.REVIEWS.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        row = _captcha_job_row(session, job)
+        review_url = row["open_url"]
+        if not review_url:
+            raise HTTPException(status_code=400, detail="Job has no review URL")
+    try:
+        with urlopen(review_url, timeout=15) as response:
+            status = getattr(response, "status", 200)
+    except HTTPError as exc:
+        status = exc.code
+    except URLError:
+        status = None
+    if status in {404, 410}:
+        with write_session() as session, session.begin():
+            fail_job(
+                session,
+                job_id=job_id,
+                status=JobStatus.FAILED,
+                message=(
+                    f"Review URL returned HTTP {status}; marked unrecoverable."
+                ),
+            )
+        return RedirectResponse(
+            f"/captcha/review/{job_id}?stale=1", status_code=303
+        )
+    return RedirectResponse(review_url, status_code=303)
+
+
+@app.get("/api/captcha/review/{job_id}")
+def captcha_review_status(job_id: int) -> JSONResponse:
+    with read_session() as session:
+        state = _captcha_job_state(session, job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JSONResponse(state)
 
 
 @app.post("/jobs/{job_id}/solve")

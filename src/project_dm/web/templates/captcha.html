@@ -111,25 +111,34 @@
     <a class="text-link" href="/captcha/review">Refresh</a>
   </div>
   {% if job_row %}
+  {% if stale %}
+  <div class="empty-state" style="border-style: solid; border-color: #f1d1c3; background: #fff7f2; color: var(--red);">
+    This review URL returned 404 or 410 and was marked unrecoverable.
+  </div>
+  {% endif %}
   <div class="captcha-card">
     <div>
       <p class="eyebrow">Current item</p>
       <h2>#{{ job.id }} {{ job.job_type }}</h2>
       <p class="hint">{{ job_row.brand_slug or job_row.family_name or "Unassigned" }}</p>
       <p class="hint">{{ job.target_url or "No target URL" }}</p>
-      <p class="hint">Offset: {{ job.current_offset }}{% if job.total_expected is not none %} / {{ job.total_expected }}{% endif %} · Attempts: {{ job.attempts }}</p>
+      <div class="review-progress">
+        <div class="progress"><i id="review-progress-bar" style="width: {{ (job.current_offset / job.total_expected * 100) if job.total_expected else 0 }}%"></i></div>
+        <p class="hint" id="review-progress-text">Collected {{ job.current_offset }}{% if job.total_expected is not none %} / {{ job.total_expected }}{% endif %} reviews · Attempts: {{ job.attempts }}</p>
+      </div>
     </div>
     <div class="captcha-actions">
       {% if open_url %}
-      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open exact review URL</a>
+      <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Open exact review URL</a>
       {% endif %}
-      <button class="button secondary" id="fetch-button" type="button">Fetch from browser</button>
+      <button class="button secondary" id="status-button" type="button">Check progress</button>
+      <form method="post" action="/jobs/{{ job.id }}/unrecoverable">
+        <button class="button danger-button" type="submit">Mark unrecoverable</button>
+      </form>
       <a class="button ghost" href="/captcha/review">Next review</a>
     </div>
   </div>
-  <p class="hint" id="solve-status">Open the exact review URL, solve the CAPTCHA if it appears, then fetch the JSON back here.</p>
-  <input type="hidden" id="open-url" value="{{ open_url or '' }}">
-  <form id="review-form" method="post" action="/captcha/review/{{ job.id }}" class="hidden"></form>
+  <p class="hint" id="solve-status">Open the exact review URL, solve the CAPTCHA if it appears, then let the worker collect the reviews. This page polls live progress.</p>
   {% else %}
   <div class="empty-state">No actionable review jobs right now.</div>
   {% endif %}
@@ -140,59 +149,78 @@
 {% if kind == "review" and job_row and open_url %}
 <script>
 (function () {
-  const reviewUrl = document.getElementById("open-url").value;
+  const statusEndpoint = "/api/captcha/review/{{ job.id }}";
   const status = document.getElementById("solve-status");
-  const button = document.getElementById("fetch-button");
-  const formAction = document.getElementById("review-form").action;
+  const progressBar = document.getElementById("review-progress-bar");
+  const progressText = document.getElementById("review-progress-text");
+  const button = document.getElementById("status-button");
+  let lastState = null;
+  let completedNotified = false;
 
   const setStatus = (message) => {
     status.textContent = message;
   };
 
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    setStatus("Fetching from your browser session...");
+  const render = (state) => {
+    const progressLabel = state.total_expected
+      ? `Collected ${state.current_offset} / ${state.total_expected} reviews`
+      : `Collected ${state.current_offset} reviews`;
+    progressText.textContent = `${progressLabel} · Attempts: ${state.attempts}`;
+    progressBar.style.width = `${state.progress_percent}%`;
+    if (state.status === "completed") {
+      setStatus("Review collection completed. You can move to the next item.");
+      if (!completedNotified) {
+        completedNotified = true;
+        window.ProjectDMPWA.notify("Reviews collected", {
+          body: progressLabel,
+        });
+      }
+      return;
+    }
+    if (state.status === "failed" || state.status === "blocked") {
+      setStatus(state.last_error || `Review job is ${state.status}.`);
+      return;
+    }
+    setStatus(state.last_error || "Waiting for the worker to collect the next page...");
+  };
+
+  const refresh = async (manual = false) => {
     try {
-      const response = await fetch(reviewUrl, {
-        method: "GET",
-        credentials: "include",
+      if (manual) {
+        button.disabled = true;
+        setStatus("Checking live job state...");
+      }
+      const response = await fetch(statusEndpoint, {
+        headers: { Accept: "application/json" },
         cache: "no-store",
       });
-      const contentType = response.headers.get("content-type") || "";
-      const bodyText = await response.text();
       if (!response.ok) {
-        setStatus(`Remote returned HTTP ${response.status}. Open the exact review URL, solve the challenge, and try again.`);
-        button.disabled = false;
+        if (manual) {
+          setStatus(`Could not load status: HTTP ${response.status}`);
+          button.disabled = false;
+        }
         return;
       }
-      if (!contentType.includes("application/json")) {
-        setStatus("The browser received a non-JSON response. Solve the challenge in the opened tab, then try again.");
-        button.disabled = false;
-        return;
+      const state = await response.json();
+      render(state);
+      if (lastState && state.current_offset !== lastState.current_offset) {
+        await window.ProjectDMPWA.notify("Review progress updated", {
+          body: `Collected ${state.current_offset}${state.total_expected ? ` / ${state.total_expected}` : ""} reviews.`,
+        });
       }
-      const payload = JSON.parse(bodyText);
-      const submit = await fetch(formAction, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!submit.ok) {
-        setStatus(`Could not save the response: HTTP ${submit.status}`);
-        button.disabled = false;
-        return;
-      }
-      await window.ProjectDMPWA.notify("Reviews imported", {
-        body: "The captured review payload was saved successfully.",
-      });
-      window.location.href = "/captcha/review";
+      lastState = state;
     } catch (error) {
       console.error(error);
-      setStatus(`Fetch failed: ${error}`);
-      button.disabled = false;
+      if (manual) {
+        setStatus(`Status check failed: ${error}`);
+        button.disabled = false;
+      }
     }
-  });
+  };
+
+  button.addEventListener("click", () => refresh(true));
+  refresh(false);
+  setInterval(() => refresh(false), 2500);
 })();
 </script>
 {% endif %}
