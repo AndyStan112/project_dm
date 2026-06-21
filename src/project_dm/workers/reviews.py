@@ -90,6 +90,10 @@ def _response_error_message(
     )
 
 
+def _status_needs_manual_solve(status: int | None) -> bool:
+    return status in {403, 405, 410, 429}
+
+
 def _attended_browser_mode() -> bool:
     return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
         "1",
@@ -304,7 +308,9 @@ def run_one_review_job(
                     file=sys.stderr,
                     flush=True,
                 )
-                if response is not None and response.status in {403, 405, 429}:
+                if response is not None and _status_needs_manual_solve(
+                    response.status
+                ):
                     _save_response_diagnostic(
                         job_id=job_id,
                         label="blocked_review_request",
