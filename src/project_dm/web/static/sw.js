@@ -1,9 +1,34 @@
 self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open("project-dm-shell-v1").then((cache) =>
+      cache.addAll([
+        "/",
+        "/manifest.webmanifest",
+        "/icon-192.png",
+        "/icon-512.png",
+        "/apple-touch-icon.png",
+      ]),
+    ),
+  );
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.mode !== "navigate") {
+    return;
+  }
+  event.respondWith(
+    fetch(request).catch(async () => {
+      const cache = await caches.open("project-dm-shell-v1");
+      const cached = await cache.match("/");
+      return cached || Response.error();
+    }),
+  );
 });
 
 self.addEventListener("message", (event) => {
