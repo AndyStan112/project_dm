@@ -388,6 +388,13 @@ def _static_text_response(filename: str, media_type: str) -> Response:
     )
 
 
+def _static_binary_response(filename: str, media_type: str) -> Response:
+    return Response(
+        content=(STATIC_DIR / filename).read_bytes(),
+        media_type=media_type,
+    )
+
+
 @app.get("/manifest.webmanifest", include_in_schema=False)
 def manifest() -> Response:
     return _static_text_response(
@@ -404,6 +411,21 @@ def service_worker() -> Response:
 @app.get("/icon.svg", include_in_schema=False)
 def app_icon() -> Response:
     return _static_text_response("icon.svg", "image/svg+xml")
+
+
+@app.get("/icon-192.png", include_in_schema=False)
+def app_icon_192() -> Response:
+    return _static_binary_response("icon-192.png", "image/png")
+
+
+@app.get("/icon-512.png", include_in_schema=False)
+def app_icon_512() -> Response:
+    return _static_binary_response("icon-512.png", "image/png")
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+def apple_touch_icon() -> Response:
+    return _static_binary_response("apple-touch-icon.png", "image/png")
 
 
 @app.get("/pwa-debug", response_class=HTMLResponse)

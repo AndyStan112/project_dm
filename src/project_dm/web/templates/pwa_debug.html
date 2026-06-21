@@ -69,11 +69,30 @@
   let deferredPrompt = null;
   let manifestPayload = null;
 
+  const probeUrl = async (url) => {
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      return {
+        url,
+        ok: response.ok,
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+      };
+    } catch (error) {
+      return { url, ok: false, error: String(error) };
+    }
+  };
+
   const updateOutput = (payload) => {
     debugOutput.textContent = JSON.stringify(payload, null, 2);
   };
 
   const updateSignals = async () => {
+    const iconStatuses = await Promise.all([
+      probeUrl(icon192Url),
+      probeUrl(icon512Url),
+      probeUrl(touchIconUrl),
+    ]);
     const payload = {
       location: window.location.href,
       standalone: window.matchMedia("(display-mode: standalone)").matches,
@@ -84,7 +103,7 @@
       installPromptAvailable: Boolean(deferredPrompt),
       manifestUrl,
       swUrl,
-      icons: [icon192Url, icon512Url, touchIconUrl],
+      icons: iconStatuses,
     };
 
     displayMode.textContent = payload.standalone
@@ -114,7 +133,9 @@
       const pngIcons = icons.filter((icon) => (icon.type || "").includes("png"));
       manifestState.textContent = `Loaded (${icons.length} icons, ${pngIcons.length} PNG)`;
       manifestId.textContent = manifestPayload.id || "(missing)";
-      manifestIcons.textContent = pngIcons.length ? "Present" : "Missing";
+      manifestIcons.textContent = iconStatuses.every((icon) => icon.ok)
+        ? "Reachable"
+        : "Missing or broken";
       payload.manifest = {
         id: manifestPayload.id || null,
         name: manifestPayload.name || null,
@@ -124,6 +145,7 @@
         display: manifestPayload.display || null,
         icons,
       };
+      payload.icon_checks = iconStatuses;
     } else {
       manifestState.textContent = "Loading...";
     }
