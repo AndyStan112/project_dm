@@ -20,7 +20,7 @@ from sqlalchemy import case, func, select
 
 from project_dm.brands import normalize_brand
 from project_dm.db import read_session, write_session
-from project_dm.models import Job, ProductFamily
+from project_dm.models import Brand, Job, ProductFamily
 from project_dm.repositories.brands import list_brands, upsert_brand
 from project_dm.repositories.dashboard import (
     dashboard_stats,
@@ -238,6 +238,7 @@ def _next_captcha_job(session, kind: str) -> Job | None:
             Job.status.in_(status.value for status in CAPTCHA_ACTIONABLE_STATUSES),
         )
         .order_by(status_rank, Job.priority.asc(), Job.updated_at.asc())
+        .with_for_update(skip_locked=True)
         .limit(1)
     )
 
@@ -509,7 +510,10 @@ def _render_captcha_job(
         if kind == "brand" and brand:
             from project_dm.brands import normalize_brand
 
-            data = normalize_brand(brand)
+            try:
+                data = normalize_brand(brand)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
             with session.begin():
                 record = upsert_brand(session, data)
                 job, _ = get_or_create_brand_listing_job(
