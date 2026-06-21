@@ -57,9 +57,9 @@
           <p>{{ job.last_error or "No error message recorded." }}</p>
         </div>
         <div class="blocked-actions">
-          <a class="button" href="{% if job.job_type == 'reviews' %}/captcha/review/{{ job.id }}{% elif job.job_type == 'product' %}/captcha/product/{{ job.id }}{% else %}/captcha/brand/{{ job.id }}{% endif %}" target="_blank" rel="noreferrer">Open captcha</a>
+          <a class="button" href="{% if job.job_type == 'reviews' %}/captcha/review/{{ job.id }}{% elif job.job_type == 'product' %}/captcha/product/{{ job.id }}{% else %}/captcha/brand/{{ job.id }}{% endif %}">Open captcha</a>
           {% if job.target_url %}
-          <a class="button secondary" href="{{ job.target_url }}" target="_blank" rel="noreferrer">Open target</a>
+          <a class="button secondary" href="{{ job.target_url }}">Open target</a>
           {% endif %}
           <form method="post" action="/jobs/{{ job.id }}/unrecoverable"><button class="button danger-button" type="submit">Unrecoverable</button></form>
           <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
@@ -242,9 +242,9 @@
           <p>${escapeHtml(job.last_error || "No error message recorded.")}</p>
         </div>
           <div class="blocked-actions">
-          <a class="button" href="${job.job_type === 'reviews' ? `/captcha/review/${encodeURIComponent(job.id)}` : job.job_type === 'product' ? `/captcha/product/${encodeURIComponent(job.id)}` : `/captcha/brand/${encodeURIComponent(job.id)}`}" target="_blank" rel="noreferrer">Open captcha</a>
+          <a class="button" href="${job.job_type === 'reviews' ? `/captcha/review/${encodeURIComponent(job.id)}` : job.job_type === 'product' ? `/captcha/product/${encodeURIComponent(job.id)}` : `/captcha/brand/${encodeURIComponent(job.id)}`}">Open captcha</a>
           <form method="post" action="/jobs/${encodeURIComponent(job.id)}/unrecoverable"><button class="button danger-button" type="submit">Unrecoverable</button></form>
-          ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}" target="_blank" rel="noreferrer">Open target</a>` : ""}
+          ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}">Open target</a>` : ""}
           <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>
           <form method="post" action="/jobs/${encodeURIComponent(job.id)}/resume"><button type="submit">Resume</button></form>
         </div>

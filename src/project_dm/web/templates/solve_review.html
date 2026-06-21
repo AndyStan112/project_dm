@@ -4,7 +4,7 @@
 {% block eyebrow %}Human-assisted review fetch{% endblock %}
 {% block actions %}
   <a class="button secondary" href="/jobs">Back to jobs</a>
-  <a class="button" href="/captcha/review/{{ job.id }}/browser" target="_blank" rel="noreferrer">Solve in server browser (VNC)</a>
+  <a class="button" href="/captcha/review/{{ job.id }}/browser">Solve in server browser (VNC)</a>
   <button class="button secondary" type="button" onclick="ProjectDMPWA.enableNotifications().then(() => ProjectDMPWA.notify('Project DM', { body: 'Notifications are enabled.' }))">Enable notifications</button>
 {% endblock %}
 {% block content %}
@@ -20,7 +20,7 @@
     <li><strong>Fetch all reviews</strong> when the browser session is ready.</li>
   </ol>
   <div class="solve-actions">
-    <a class="button secondary" href="{{ review_url }}" target="_blank" rel="noreferrer">Validate review endpoint</a>
+    <a class="button secondary" href="{{ review_url }}">Validate review endpoint</a>
     <button class="button" id="fetch-button" type="button">Fetch all reviews from this browser</button>
   </div>
   <p class="hint" id="solve-status">Ready.</p>

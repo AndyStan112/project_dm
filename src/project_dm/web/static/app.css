@@ -24,6 +24,7 @@ button, input, select { font: inherit; }
 nav { display: grid; gap: 7px; }
 nav a { padding: 12px 13px; display: flex; justify-content: space-between; border-radius: 8px; color: #9fb0a8; }
 nav a:hover, nav a.active { color: white; background: rgba(255,255,255,.08); }
+nav .nav-icon { display: none; }
 nav kbd { color: #667b71; background: transparent; font-size: 10px; }
 .sidebar-note { margin-top: auto; padding: 14px; display: flex; gap: 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; }
 .sidebar-note strong, .sidebar-note small { display: block; }
@@ -152,11 +153,11 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .workers-grid .status-tile small { text-transform: none; }
 .hidden { display: none; }
 @media (max-width: 1050px) {
-  .app-shell { grid-template-columns: 84px minmax(0,1fr); }.sidebar { padding-inline: 14px; }.brand-mark span:last-child, nav span, nav kbd, .sidebar-note div { display: none; }.brand-mark { margin-inline: 6px; }.sidebar-note { justify-content: center; }
+  .app-shell { grid-template-columns: 84px minmax(0,1fr); }.sidebar { padding-inline: 14px; }.brand-mark span:last-child, nav span:not(.nav-icon), nav kbd, .sidebar-note div { display: none; }.nav-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255,255,255,.08); color: white; font-size: 13px; font-weight: 900; letter-spacing: .04em; }.brand-mark { margin-inline: 6px; }.sidebar-note { justify-content: center; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }.product-grid { grid-template-columns: repeat(2, 1fr); }.captcha-tabs { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
-  .app-shell { display: block; }.sidebar { position: static; width: 100%; height: auto; padding: 12px; flex-direction: row; align-items: center; overflow-x: auto; }.brand-mark { margin: 0 8px 0 0; }.brand-icon { width: 36px; height: 36px; }nav { display: flex; }.sidebar-note { display: none; }
+  .app-shell { display: block; }.sidebar { position: static; width: 100%; height: auto; padding: 12px; flex-direction: row; align-items: center; overflow-x: auto; }.brand-mark { margin: 0 8px 0 0; }.brand-icon { width: 36px; height: 36px; }nav { display: flex; gap: 8px; }.nav-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(255,255,255,.08); color: white; font-size: 13px; font-weight: 900; flex: 0 0 auto; }.sidebar nav a { padding: 0; width: 38px; height: 38px; justify-content: center; }.sidebar nav a > span:not(.nav-icon), .sidebar nav kbd { display: none; }.sidebar-note { display: none; }
   main { padding: 24px 16px 45px; }.topbar { align-items: start; gap: 18px; }.topbar-actions { justify-content: end; }
   .topbar-actions, .worker-buttons, .blocked-actions, .solve-actions, .inline-form, .filter-form { width: 100%; }
   .topbar-actions, .worker-buttons, .blocked-actions { flex-direction: column; align-items: stretch; }

@@ -25,24 +25,31 @@
       </a>
       <nav>
         <a class="{{ 'active' if active == 'dashboard' else '' }}" href="/">
+          <span class="nav-icon" aria-hidden="true">O</span>
           <span>Overview</span><kbd>01</kbd>
         </a>
         <a class="{{ 'active' if active == 'jobs' else '' }}" href="/jobs">
+          <span class="nav-icon" aria-hidden="true">J</span>
           <span>Collection jobs</span><kbd>02</kbd>
         </a>
         <a class="{{ 'active' if active == 'workers' else '' }}" href="/workers">
+          <span class="nav-icon" aria-hidden="true">W</span>
           <span>Workers</span><kbd>03</kbd>
         </a>
         <a class="{{ 'active' if active == 'products' else '' }}" href="/products">
+          <span class="nav-icon" aria-hidden="true">P</span>
           <span>Products</span><kbd>04</kbd>
         </a>
         <a class="{{ 'active' if active == 'reviews' else '' }}" href="/reviews">
+          <span class="nav-icon" aria-hidden="true">R</span>
           <span>Reviews</span><kbd>05</kbd>
         </a>
         <a class="{{ 'active' if active == 'captcha' else '' }}" href="/captcha">
+          <span class="nav-icon" aria-hidden="true">C</span>
           <span>Captcha</span><kbd>06</kbd>
         </a>
         <a class="{{ 'active' if active == 'pwa_debug' else '' }}" href="/pwa-debug">
+          <span class="nav-icon" aria-hidden="true">D</span>
           <span>PWA debug</span><kbd>07</kbd>
         </a>
       </nav>

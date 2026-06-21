@@ -74,7 +74,7 @@
     </div>
     <div class="captcha-actions">
       {% if open_url %}
-      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
+      <a class="button" href="{{ open_url }}">Open target</a>
       {% endif %}
       {% if job_row %}
       <form method="post" action="/captcha/brand/{{ job.id }}/unrecoverable">
@@ -110,7 +110,7 @@
     </div>
     <div class="captcha-actions">
       {% if open_url %}
-      <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
+      <a class="button" href="{{ open_url }}">Open target</a>
       {% endif %}
       <form method="post" action="/captcha/product/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
@@ -152,9 +152,9 @@
     </div>
     <div class="captcha-actions">
       {% if open_url %}
-      <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Validate exact review URL</a>
+      <a class="button" href="/captcha/review/{{ job.id }}/open">Validate exact review URL</a>
       {% endif %}
-      <a class="button secondary" href="/captcha/review/{{ job.id }}/browser" target="_blank" rel="noreferrer">Solve in server browser (VNC)</a>
+      <a class="button secondary" href="/captcha/review/{{ job.id }}/browser">Solve in server browser (VNC)</a>
       <button class="button secondary" id="debug-button" type="button" title="Show job state" aria-label="Show job state">i</button>
       <button class="button secondary" id="status-button" type="button">Check progress</button>
       <form method="post" action="/captcha/review/{{ job.id }}/unrecoverable">
