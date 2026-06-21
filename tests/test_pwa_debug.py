@@ -29,5 +29,5 @@ def test_pwa_debug_page_context(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.template.name == "pwa_debug.html"
-    assert response.context["manifest_url"] == "/manifest.webmanifest"
+    assert response.context["manifest_url"] == "/static/manifest.webmanifest"
     assert response.context["sw_url"] == "/sw.js"

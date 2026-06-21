@@ -3,10 +3,10 @@ self.addEventListener("install", (event) => {
     caches.open("project-dm-shell-v1").then((cache) =>
       cache.addAll([
         "/",
-        "/manifest.webmanifest",
-        "/icon-192.png",
-        "/icon-512.png",
-        "/apple-touch-icon.png",
+        "/static/manifest.webmanifest",
+        "/static/icon-192.png",
+        "/static/icon-512.png",
+        "/static/apple-touch-icon.png",
       ]),
     ),
   );

@@ -435,15 +435,15 @@ def pwa_debug(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "pwa_debug.html",
-        _context(
+            _context(
             request,
             active="pwa_debug",
             worker_status=worker_status,
-            manifest_url="/manifest.webmanifest",
+            manifest_url="/static/manifest.webmanifest",
             sw_url="/sw.js",
-            icon_192_url="/icon-192.png",
-            icon_512_url="/icon-512.png",
-            touch_icon_url="/apple-touch-icon.png",
+            icon_192_url="/static/icon-192.png",
+            icon_512_url="/static/icon-512.png",
+            touch_icon_url="/static/apple-touch-icon.png",
         ),
     )
 
