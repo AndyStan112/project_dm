@@ -1,9 +1,11 @@
 {
+  "id": "/",
   "name": "Project DM",
   "short_name": "Project DM",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone"],
   "background_color": "#f4f5f1",
   "theme_color": "#14251e",
   "description": "Dashboard for eMAG review collection and mobile CAPTCHA solving.",
