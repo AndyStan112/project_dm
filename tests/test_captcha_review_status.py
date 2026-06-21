@@ -112,6 +112,7 @@ def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> No
         yield fake_session
 
     monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(web_app, "list_service_controls", lambda session: [])
     monkeypatch.setattr(
         web_app,
         "set_job_status",
@@ -123,6 +124,60 @@ def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> No
     assert response.status_code == 303
     assert response.headers["location"] == "/browser"
     assert fake_session.job.last_error is None
+
+
+def test_solve_captcha_review_in_browser_requeues_stale_running_job(
+    monkeypatch,
+) -> None:
+    class FakeJob:
+        def __init__(self) -> None:
+            self.id = 277
+            self.job_type = "reviews"
+            self.status = "running"
+            self.last_error = "Review URL returned HTTP 410; marked unrecoverable."
+
+    class FakeControl:
+        service_name = "scraper"
+        current_job_id = None
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.job = FakeJob()
+
+        def get(self, model, job_id, with_for_update=False):  # noqa: ANN001
+            return self.job if job_id == self.job.id else None
+
+        def begin(self):
+            return nullcontext()
+
+        def flush(self) -> None:
+            pass
+
+    fake_session = FakeSession()
+    calls: list[tuple[int, str]] = []
+
+    @contextmanager
+    def fake_write_session():
+        yield fake_session
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(
+        web_app,
+        "list_service_controls",
+        lambda session: [FakeControl()],
+    )
+    monkeypatch.setattr(
+        web_app,
+        "set_job_status",
+        lambda session, job_id, status: calls.append((job_id, status.value)),
+    )
+
+    response = web_app.solve_captcha_review_in_browser(277)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/browser"
+    assert fake_session.job.last_error is None
+    assert calls == [(277, "pending")]
 
 
 def test_captcha_review_debug_returns_job_state(monkeypatch) -> None:

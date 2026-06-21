@@ -899,11 +899,24 @@ def solve_captcha_review_in_browser(job_id: int) -> RedirectResponse:
                 status_code=400,
                 detail="Job type does not match captcha page",
             )
-        if job.status in {
-            JobStatus.FAILED.value,
-            JobStatus.BLOCKED.value,
-            JobStatus.PAUSED.value,
-        }:
+        scraper_control = next(
+            (
+                control
+                for control in list_service_controls(session)
+                if control.service_name == "scraper"
+            ),
+            None,
+        )
+        should_requeue = (
+            job.status in {
+                JobStatus.FAILED.value,
+                JobStatus.BLOCKED.value,
+                JobStatus.PAUSED.value,
+            }
+            or scraper_control is None
+            or scraper_control.current_job_id != job.id
+        )
+        if should_requeue:
             set_job_status(session, job_id, JobStatus.PENDING)
         job = session.get(Job, job_id)
         if job is not None and job.last_error:
