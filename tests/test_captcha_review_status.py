@@ -123,3 +123,29 @@ def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> No
     assert response.status_code == 303
     assert response.headers["location"] == "/browser"
     assert fake_session.job.last_error is None
+
+
+def test_captcha_review_debug_returns_job_state(monkeypatch) -> None:
+    @contextmanager
+    def fake_write_session():
+        yield object()
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(
+        web_app,
+        "_captcha_job_debug_state",
+        lambda session, job_id: {
+            "job": {"id": job_id, "status": "running"},
+            "brand": None,
+            "family": None,
+            "controls": {"scraper": {"current_state": "running"}},
+        },
+    )
+
+    client = TestClient(web_app.app)
+    response = client.get("/api/captcha/review/42/debug")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["job"]["id"] == 42
+    assert payload["controls"]["scraper"]["current_state"] == "running"

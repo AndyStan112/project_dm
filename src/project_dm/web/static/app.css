@@ -112,6 +112,18 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rg
 .solve-actions .button { width: 100%; }
 .solve-steps { margin: 14px 0 0; padding: 0 0 0 18px; color: var(--muted); display: grid; gap: 6px; }
 .solve-steps strong { color: var(--ink); }
+.debug-panel {
+  margin: 14px 0 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcfa;
+  color: #2e3e37;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+}
 .empty-state { padding: 45px; color: var(--muted); text-align: center; border: 1px dashed var(--line); border-radius: 12px; background: white; }
 .notice-panel { border-left: 4px solid var(--orange); }
 .notice-panel code { padding: 1px 4px; border-radius: 4px; background: #f4efe7; }

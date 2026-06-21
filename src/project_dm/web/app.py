@@ -257,6 +257,99 @@ def _captcha_job_state(session, job_id: int) -> dict[str, object] | None:
     }
 
 
+def _serialize_job(job: Job) -> dict[str, object]:
+    return {
+        "id": job.id,
+        "job_type": job.job_type,
+        "status": job.status,
+        "brand_id": job.brand_id,
+        "family_id": job.family_id,
+        "target_url": job.target_url,
+        "current_offset": job.current_offset,
+        "total_expected": job.total_expected,
+        "attempts": job.attempts,
+        "priority": job.priority,
+        "last_error": job.last_error,
+        "locked_at": job.locked_at.isoformat() if job.locked_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+        "created_at": job.created_at.isoformat(),
+        "updated_at": job.updated_at.isoformat(),
+    }
+
+
+def _captcha_job_debug_state(session, job_id: int) -> dict[str, object] | None:
+    job = session.get(Job, job_id)
+    if job is None:
+        return None
+    row = session.execute(
+        select(Brand, ProductFamily)
+        .select_from(Job)
+        .outerjoin(Brand, Brand.id == Job.brand_id)
+        .outerjoin(ProductFamily, ProductFamily.id == Job.family_id)
+        .where(Job.id == job.id)
+    ).one()
+    brand, family = row
+    controls = {
+        control.service_name: {
+            "service_name": control.service_name,
+            "desired_state": control.desired_state,
+            "current_state": control.current_state,
+            "current_job_id": control.current_job_id,
+            "last_heartbeat_at": (
+                control.last_heartbeat_at.isoformat()
+                if control.last_heartbeat_at is not None
+                else None
+            ),
+            "message": control.message,
+            "created_at": control.created_at.isoformat(),
+            "updated_at": control.updated_at.isoformat(),
+        }
+        for control in list_service_controls(session)
+    }
+    return {
+        "job": _serialize_job(job),
+        "brand": (
+            {
+                "id": brand.id,
+                "name": brand.name,
+                "slug": brand.slug,
+                "listing_url": brand.listing_url,
+                "enabled": brand.enabled,
+                "created_at": brand.created_at.isoformat(),
+                "updated_at": brand.updated_at.isoformat(),
+            }
+            if brand is not None
+            else None
+        ),
+        "family": (
+            {
+                "id": family.id,
+                "brand_id": family.brand_id,
+                "emag_family_id": family.emag_family_id,
+                "name": family.name,
+                "description": family.description,
+                "aggregate_rating": (
+                    str(family.aggregate_rating)
+                    if family.aggregate_rating is not None
+                    else None
+                ),
+                "review_count": family.review_count,
+                "url": family.url,
+                "scraped_at": (
+                    family.scraped_at.isoformat()
+                    if family.scraped_at is not None
+                    else None
+                ),
+                "created_at": family.created_at.isoformat(),
+                "updated_at": family.updated_at.isoformat(),
+            }
+            if family is not None
+            else None
+        ),
+        "controls": controls,
+    }
+
+
 def _next_captcha_job(session, kind: str) -> Job | None:
     job_type = _captcha_job_type(kind)
     status_rank = case(
@@ -817,6 +910,15 @@ def solve_captcha_review_in_browser(job_id: int) -> RedirectResponse:
             job.last_error = None
             session.flush()
     return RedirectResponse("/browser", status_code=303)
+
+
+@app.get("/api/captcha/review/{job_id}/debug")
+def captcha_review_debug(job_id: int) -> JSONResponse:
+    with write_session() as session:
+        state = _captcha_job_debug_state(session, job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JSONResponse(state)
 
 
 @app.get("/api/captcha/review/{job_id}")

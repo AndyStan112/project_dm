@@ -155,6 +155,7 @@
       <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Validate exact review URL</a>
       {% endif %}
       <a class="button secondary" href="/captcha/review/{{ job.id }}/browser" target="_blank" rel="noreferrer">Solve in server browser (VNC)</a>
+      <button class="button secondary" id="debug-button" type="button" title="Show job state" aria-label="Show job state">i</button>
       <button class="button secondary" id="status-button" type="button">Check progress</button>
       <form method="post" action="/captcha/review/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
@@ -169,6 +170,7 @@
     Validate the exact review URL in a normal tab, or open the server browser to solve the CAPTCHA there. This page polls live progress.
     {% endif %}
   </p>
+  <pre class="debug-panel" id="job-debug" hidden></pre>
   {% else %}
   <div class="empty-state">No actionable review jobs right now.</div>
   {% endif %}
@@ -180,15 +182,23 @@
 <script>
 (function () {
   const statusEndpoint = "/api/captcha/review/{{ job.id }}";
+  const debugEndpoint = "/api/captcha/review/{{ job.id }}/debug";
   const status = document.getElementById("solve-status");
   const progressBar = document.getElementById("review-progress-bar");
   const progressText = document.getElementById("review-progress-text");
+  const debugButton = document.getElementById("debug-button");
+  const debugPanel = document.getElementById("job-debug");
   const button = document.getElementById("status-button");
   let lastState = null;
   let completedNotified = false;
+  let debugLoaded = false;
 
   const setStatus = (message) => {
     status.textContent = message;
+  };
+
+  const setDebug = (message) => {
+    debugPanel.textContent = message;
   };
 
   const render = (state) => {
@@ -252,6 +262,31 @@
   };
 
   button.addEventListener("click", () => refresh(true));
+  debugButton.addEventListener("click", async () => {
+    if (debugPanel.hidden && !debugLoaded) {
+      debugPanel.hidden = false;
+      setDebug("Loading job debug state...");
+      try {
+        const response = await fetch(debugEndpoint, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          setDebug(`Could not load debug state: HTTP ${response.status}`);
+          return;
+        }
+        const payload = await response.json();
+        setDebug(JSON.stringify(payload, null, 2));
+        debugLoaded = true;
+        return;
+      } catch (error) {
+        console.error(error);
+        setDebug(`Debug load failed: ${error}`);
+        return;
+      }
+    }
+    debugPanel.hidden = !debugPanel.hidden;
+  });
   refresh(false);
   setInterval(() => refresh(false), 2500);
 })();
