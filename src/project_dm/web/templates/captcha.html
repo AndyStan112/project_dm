@@ -154,7 +154,7 @@
       {% if open_url %}
       <a class="button" href="/captcha/review/{{ job.id }}/open" target="_blank" rel="noreferrer">Validate exact review URL</a>
       {% endif %}
-      <a class="button secondary" href="/browser" target="_blank" rel="noreferrer">Open server browser (VNC)</a>
+      <a class="button secondary" href="/captcha/review/{{ job.id }}/browser" target="_blank" rel="noreferrer">Solve in server browser (VNC)</a>
       <button class="button secondary" id="status-button" type="button">Check progress</button>
       <form method="post" action="/captcha/review/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>

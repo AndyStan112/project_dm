@@ -795,6 +795,30 @@ def open_captcha_review(job_id: int) -> RedirectResponse:
     return RedirectResponse(review_url, status_code=303)
 
 
+@app.get("/captcha/review/{job_id}/browser")
+def solve_captcha_review_in_browser(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.REVIEWS.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        if job.status in {
+            JobStatus.FAILED.value,
+            JobStatus.BLOCKED.value,
+            JobStatus.PAUSED.value,
+        }:
+            set_job_status(session, job_id, JobStatus.PENDING)
+        job = session.get(Job, job_id)
+        if job is not None and job.last_error:
+            job.last_error = None
+            session.flush()
+    return RedirectResponse("/browser", status_code=303)
+
+
 @app.get("/api/captcha/review/{job_id}")
 def captcha_review_status(job_id: int) -> JSONResponse:
     # Use the write connection here so the mobile progress view reflects the

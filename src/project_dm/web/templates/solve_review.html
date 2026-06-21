@@ -4,7 +4,7 @@
 {% block eyebrow %}Human-assisted review fetch{% endblock %}
 {% block actions %}
   <a class="button secondary" href="/jobs">Back to jobs</a>
-  <a class="button" href="/browser" target="_blank" rel="noreferrer">Open server browser (VNC)</a>
+  <a class="button" href="/captcha/review/{{ job.id }}/browser" target="_blank" rel="noreferrer">Solve in server browser (VNC)</a>
   <button class="button secondary" type="button" onclick="ProjectDMPWA.enableNotifications().then(() => ProjectDMPWA.notify('Project DM', { body: 'Notifications are enabled.' }))">Enable notifications</button>
 {% endblock %}
 {% block content %}
