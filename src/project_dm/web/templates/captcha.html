@@ -55,6 +55,11 @@
     <div><p class="eyebrow">Brand</p><h2>Start a brand listing queue</h2></div>
     <span class="panel-tag">{{ "active" if job_row else "idle" }}</span>
   </div>
+  {% if marked %}
+  <div class="empty-state" style="border-style: solid; border-color: #d7e8dc; background: #f3fbf6; color: var(--green);">
+    Brand job marked unrecoverable. Loading the next brand.
+  </div>
+  {% endif %}
   <form class="filter-form" method="post" action="/captcha/brand">
     <label>Brand name or URL<input name="brand" value="{{ brand_value or '' }}" placeholder="Apple or https://www.emag.ro/.../brand/apple/c"></label>
     <button class="button" type="submit">Load brand</button>
@@ -71,6 +76,11 @@
       {% if open_url %}
       <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
       {% endif %}
+      {% if job_row %}
+      <form method="post" action="/captcha/brand/{{ job.id }}/unrecoverable">
+        <button class="button danger-button" type="submit">Mark unrecoverable</button>
+      </form>
+      {% endif %}
       <a class="button secondary" href="/captcha/brand">Next brand</a>
     </div>
   </div>
@@ -84,6 +94,11 @@
     <div><p class="eyebrow">Product</p><h2>Continue discovered product jobs</h2></div>
     <a class="text-link" href="/captcha/product">Refresh</a>
   </div>
+  {% if marked %}
+  <div class="empty-state" style="border-style: solid; border-color: #d7e8dc; background: #f3fbf6; color: var(--green);">
+    Product job marked unrecoverable. Loading the next product.
+  </div>
+  {% endif %}
   {% if job_row %}
   <div class="captcha-card">
     <div>
@@ -97,6 +112,9 @@
       {% if open_url %}
       <a class="button" href="{{ open_url }}" target="_blank" rel="noreferrer">Open target</a>
       {% endif %}
+      <form method="post" action="/captcha/product/{{ job.id }}/unrecoverable">
+        <button class="button danger-button" type="submit">Mark unrecoverable</button>
+      </form>
       <a class="button secondary" href="/captcha/product">Next product</a>
     </div>
   </div>
@@ -114,6 +132,11 @@
   {% if stale %}
   <div class="empty-state" style="border-style: solid; border-color: #f1d1c3; background: #fff7f2; color: var(--red);">
     This review URL returned 404 or 410 and was marked unrecoverable.
+  </div>
+  {% endif %}
+  {% if marked %}
+  <div class="empty-state" style="border-style: solid; border-color: #d7e8dc; background: #f3fbf6; color: var(--green);">
+    Review job marked unrecoverable. Loading the next review.
   </div>
   {% endif %}
   <div class="captcha-card">

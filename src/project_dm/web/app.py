@@ -540,6 +540,8 @@ def _render_captcha_job(
     kind: str,
     job_id: int | None = None,
     brand: str | None = None,
+    marked: int | None = None,
+    stale: int | None = None,
 ) -> HTMLResponse:
     job_type = _captcha_job_type(kind)
     with write_session() as session:
@@ -572,6 +574,7 @@ def _render_captcha_job(
                     open_url=row["open_url"],
                     next_url="/captcha/brand",
                     brand_value=brand,
+                    marked=bool(marked),
                 ),
             )
 
@@ -606,6 +609,8 @@ def _render_captcha_job(
             open_url=row["open_url"] if row else None,
             next_url=f"/captcha/{kind}",
             brand_value=brand or "",
+            marked=bool(marked),
+            stale=bool(stale),
         ),
     )
 
@@ -615,12 +620,14 @@ def captcha_brand(
     request: Request,
     brand: str = "",
     job_id: int | None = None,
+    marked: int | None = None,
 ) -> HTMLResponse:
     return _render_captcha_job(
         request,
         kind="brand",
         job_id=job_id,
         brand=brand or None,
+        marked=marked,
     )
 
 
@@ -628,8 +635,9 @@ def captcha_brand(
 def captcha_brand_job(
     request: Request,
     job_id: int,
+    marked: int | None = None,
 ) -> HTMLResponse:
-    return _render_captcha_job(request, kind="brand", job_id=job_id)
+    return _render_captcha_job(request, kind="brand", job_id=job_id, marked=marked)
 
 
 @app.post("/captcha/brand")
@@ -642,20 +650,66 @@ def submit_captcha_brand(
     )
 
 
+@app.post("/captcha/brand/{job_id}/unrecoverable")
+def captcha_brand_unrecoverable(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.BRAND_LISTING.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        set_job_status(session, job_id, JobStatus.FAILED)
+        job = session.get(Job, job_id)
+        if job is not None:
+            job.last_error = job.last_error or "Marked unrecoverable by user."
+            job.finished_at = datetime.now(UTC)
+            session.flush()
+    return RedirectResponse("/captcha/brand?marked=1", status_code=303)
+
+
 @app.get("/captcha/product", response_class=HTMLResponse)
 def captcha_product(
     request: Request,
     job_id: int | None = None,
+    marked: int | None = None,
 ) -> HTMLResponse:
-    return _render_captcha_job(request, kind="product", job_id=job_id)
+    return _render_captcha_job(
+        request, kind="product", job_id=job_id, marked=marked
+    )
 
 
 @app.get("/captcha/product/{job_id}", response_class=HTMLResponse)
 def captcha_product_job(
     request: Request,
     job_id: int,
+    marked: int | None = None,
 ) -> HTMLResponse:
-    return _render_captcha_job(request, kind="product", job_id=job_id)
+    return _render_captcha_job(
+        request, kind="product", job_id=job_id, marked=marked
+    )
+
+
+@app.post("/captcha/product/{job_id}/unrecoverable")
+def captcha_product_unrecoverable(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.PRODUCT.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        set_job_status(session, job_id, JobStatus.FAILED)
+        job = session.get(Job, job_id)
+        if job is not None:
+            job.last_error = job.last_error or "Marked unrecoverable by user."
+            job.finished_at = datetime.now(UTC)
+            session.flush()
+    return RedirectResponse("/captcha/product?marked=1", status_code=303)
 
 
 @app.get("/captcha/review", response_class=HTMLResponse)
@@ -664,7 +718,9 @@ def captcha_review(
     job_id: int | None = None,
     marked: int | None = None,
 ) -> HTMLResponse:
-    return _render_captcha_job(request, kind="review", job_id=job_id)
+    return _render_captcha_job(
+        request, kind="review", job_id=job_id, marked=marked
+    )
 
 
 @app.get("/jobs/{job_id}/solve")
@@ -677,6 +733,7 @@ def captcha_review_job(
     request: Request,
     job_id: int,
     stale: int | None = None,
+    marked: int | None = None,
 ) -> HTMLResponse:
     with write_session() as session, session.begin():
         job = session.get(Job, job_id)
@@ -702,13 +759,14 @@ def captcha_review_job(
             open_url=row["open_url"],
             next_url="/captcha/review",
             stale=bool(stale),
+            marked=bool(marked),
         ),
     )
 
 
 @app.get("/captcha/review/{job_id}/open")
 def open_captcha_review(job_id: int) -> RedirectResponse:
-    with read_session() as session:
+    with write_session() as session, session.begin():
         job = session.get(Job, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
@@ -721,12 +779,20 @@ def open_captcha_review(job_id: int) -> RedirectResponse:
         review_url = row["open_url"]
         if not review_url:
             raise HTTPException(status_code=400, detail="Job has no review URL")
+        if job.status in {
+            JobStatus.FAILED.value,
+            JobStatus.BLOCKED.value,
+            JobStatus.PAUSED.value,
+        }:
+            set_job_status(session, job_id, JobStatus.PENDING)
     return RedirectResponse(review_url, status_code=303)
 
 
 @app.get("/api/captcha/review/{job_id}")
 def captcha_review_status(job_id: int) -> JSONResponse:
-    with read_session() as session:
+    # Use the write connection here so the mobile progress view reflects the
+    # latest state immediately after a manual browser intervention.
+    with write_session() as session:
         state = _captcha_job_state(session, job_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Job not found")
