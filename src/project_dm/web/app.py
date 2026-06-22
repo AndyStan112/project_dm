@@ -11,7 +11,6 @@ from dataclasses import asdict
 from urllib.parse import quote_plus
 
 import uvicorn
-import httpx
 from fastapi import Body, FastAPI, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -1246,25 +1245,12 @@ def reviews(
 @app.post("/products/{family_id}/scrape-reviews")
 def scrape_product_reviews(
     family_id: int,
+    payload: dict[str, object] = Body(...),
 ) -> JSONResponse:
     with write_session() as session, session.begin():
         family = session.get(ProductFamily, family_id, with_for_update=True)
         if family is None:
             raise HTTPException(status_code=404, detail="Product family not found")
-        reviews_url = build_reviews_url(
-            family.url,
-            offset=0,
-            limit=min(max((family.review_count or 10), 10), 1000),
-        )
-        try:
-            response = httpx.get(reviews_url, timeout=60.0)
-            response.raise_for_status()
-            payload = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            raise HTTPException(
-                status_code=502,
-                detail=f"Could not fetch reviews from eMAG: {exc}",
-            ) from exc
         reviews_seen, review_count = import_review_payload(
             session,
             family_id=family_id,
@@ -1278,7 +1264,7 @@ def scrape_product_reviews(
             "family_id": family_id,
             "reviews_seen": reviews_seen,
             "review_count": review_count,
-            "message": "Reviews imported from eMAG.",
+            "message": "Reviews imported from pasted JSON.",
         }
     )
 

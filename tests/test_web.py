@@ -108,23 +108,11 @@ def test_scrape_product_reviews_imports_payload(monkeypatch) -> None:
     fake_session = FakeSession()
     calls: list[tuple[int, dict[str, object]]] = []
 
-    class FakeResponse:
-        def raise_for_status(self) -> None:
-            pass
-
-        def json(self) -> dict[str, object]:
-            return {"response": {"code": 200}, "reviews": {"count": 222, "items": []}}
-
     @contextmanager
     def fake_write_session():
         yield fake_session
 
     monkeypatch.setattr(web_app, "write_session", fake_write_session)
-    monkeypatch.setattr(
-        web_app,
-        "httpx",
-        SimpleNamespace(get=lambda url, timeout: FakeResponse()),
-    )
     monkeypatch.setattr(
         web_app,
         "import_review_payload",
@@ -134,6 +122,10 @@ def test_scrape_product_reviews_imports_payload(monkeypatch) -> None:
 
     response = web_app.scrape_product_reviews(
         58,
+        payload={
+            "response": {"code": 200},
+            "reviews": {"count": 222, "items": []},
+        },
     )
 
     assert response.status_code == 200
@@ -141,7 +133,7 @@ def test_scrape_product_reviews_imports_payload(monkeypatch) -> None:
         "family_id": 58,
         "reviews_seen": 7,
         "review_count": 222,
-        "message": "Reviews imported from eMAG.",
+        "message": "Reviews imported from pasted JSON.",
     }
     assert calls == [
         (

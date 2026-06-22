@@ -5,8 +5,8 @@
 {% block eyebrow %}{{ product.brand_slug }} · family {{ family.emag_family_id }}{% endblock %}
 {% block actions %}
   <a class="button secondary" href="{{ family.url }}">Open on eMAG</a>
+  <a class="button secondary" href="{{ reviews_url }}" target="_blank" rel="noreferrer">Open review JSON</a>
   <a class="button" href="/reviews?q={{ family.name | urlencode }}">Search reviews</a>
-  <button class="button secondary" type="button" id="scrape-reviews-button">Scrape reviews</button>
 {% endblock %}
 {% block content %}
 <section class="detail-grid">
@@ -18,7 +18,7 @@
       <div><strong>{{ family.review_count or 0 }}</strong><small>eMAG reviews</small></div>
       <div><strong>{{ reviews|length }}</strong><small>shown below</small></div>
     </div>
-    <p class="hint" id="scrape-reviews-status">Use the button above to ask Project DM to fetch the latest review JSON from eMAG and import it.</p>
+    <p class="hint" id="scrape-reviews-status">Open the review JSON, copy it, then paste it below and import it into Project DM.</p>
   </article>
   <article class="panel">
     <div class="panel-heading"><div><p class="eyebrow">Distribution</p><h2>Ratings</h2></div></div>
@@ -31,6 +31,19 @@
   <div class="table-wrap"><table><thead><tr><th>PNK</th><th>Storage</th><th>Color</th><th>Price</th><th>Available</th></tr></thead><tbody>{% for variant in product.variants %}<tr><td><a class="text-link" href="{{ variant.url }}">{{ variant.pnk }}</a></td><td>{{ variant.storage or "–" }}</td><td>{{ variant.color or "–" }}</td><td>{{ "{:,.2f}".format(variant.price) if variant.price else "–" }} {{ variant.currency or "" }}</td><td><span class="badge {{ 'completed' if variant.available else 'paused' }}">{{ "yes" if variant.available else "no" }}</span></td></tr>{% endfor %}</tbody></table></div>
 </section>
 <section class="panel">
+  <div class="panel-heading"><div><p class="eyebrow">Import</p><h2>Paste review JSON</h2></div></div>
+  <form id="scrape-reviews-form" class="inline-form">
+    <label style="display: grid; gap: 8px; width: 100%;">
+      Paste the eMAG review JSON here
+      <textarea id="scrape-reviews-payload" rows="12" placeholder='{"response": {"code": 200}, "reviews": {...}}' required></textarea>
+    </label>
+    <div class="worker-buttons">
+      <button class="button" type="submit" id="scrape-reviews-button">Import pasted JSON</button>
+      <a class="button secondary" href="{{ reviews_url }}" target="_blank" rel="noreferrer">Open review JSON</a>
+    </div>
+  </form>
+</section>
+<section class="panel">
   <div class="panel-heading"><div><p class="eyebrow">Sample</p><h2>Latest collected reviews</h2></div><a class="text-link" href="/reviews?q={{ family.name | urlencode }}">See matching reviews</a></div>
   <div class="review-list">{% for row in reviews %}{% include "_review_card.html" %}{% else %}<div class="empty-state">No reviews collected for this family yet.</div>{% endfor %}</div>
 </section>
@@ -38,9 +51,11 @@
 {% block scripts %}
 <script>
 (function () {
+  const form = document.getElementById("scrape-reviews-form");
   const button = document.getElementById("scrape-reviews-button");
+  const payloadField = document.getElementById("scrape-reviews-payload");
   const status = document.getElementById("scrape-reviews-status");
-  if (!button || !status) return;
+  if (!form || !button || !payloadField || !status) return;
 
   const importEndpoint = {{ scrape_reviews_endpoint | tojson }};
 
@@ -48,15 +63,19 @@
     status.textContent = message;
   };
 
-  button.addEventListener("click", async () => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
     button.disabled = true;
     try {
-      setStatus("Fetching reviews from eMAG through Project DM...");
+      setStatus("Importing pasted JSON...");
+      const payload = JSON.parse(payloadField.value);
       const importResponse = await fetch(importEndpoint, {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Accept: "application/json",
         },
+        body: JSON.stringify(payload),
       });
       if (!importResponse.ok) {
         const detail = await importResponse.text();
@@ -65,7 +84,7 @@
         );
       }
       const result = await importResponse.json();
-      setStatus(`Imported ${result.reviews_seen} reviews from eMAG.`);
+      setStatus(`Imported ${result.reviews_seen} reviews from pasted JSON.`);
       if (window.ProjectDMPWA && typeof window.ProjectDMPWA.notify === "function") {
         await window.ProjectDMPWA.notify("Reviews imported", {
           body: `Imported ${result.reviews_seen} reviews for this family.`,
