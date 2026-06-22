@@ -59,6 +59,50 @@
 
   const importEndpoint = {{ scrape_reviews_endpoint | tojson }};
 
+  const extractJsonText = (value) => {
+    let text = String(value || "").trim();
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+    const start = text.search(/[\[{]/);
+    if (start > 0) {
+      text = text.slice(start).trim();
+    }
+    const firstChar = text[0];
+    if (firstChar !== "{" && firstChar !== "[") {
+      return text;
+    }
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (char === "\\") {
+          escaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{" || char === "[") {
+        depth += 1;
+        continue;
+      }
+      if (char === "}" || char === "]") {
+        depth -= 1;
+        if (depth === 0) {
+          return text.slice(0, index + 1);
+        }
+      }
+    }
+    return text;
+  };
+
   const setStatus = (message) => {
     status.textContent = message;
   };
@@ -68,7 +112,7 @@
     button.disabled = true;
     try {
       setStatus("Importing pasted JSON...");
-      const payload = JSON.parse(payloadField.value);
+      const payload = JSON.parse(extractJsonText(payloadField.value));
       const importResponse = await fetch(importEndpoint, {
         method: "POST",
         headers: {
@@ -93,7 +137,7 @@
     } catch (error) {
       console.error("Scrape reviews failed", error);
       setStatus(
-        `Scrape failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Scrape failed: ${error instanceof Error ? error.message : String(error)}. Paste only the JSON response if possible.`,
       );
     } finally {
       button.disabled = false;
