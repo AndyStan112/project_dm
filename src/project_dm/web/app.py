@@ -81,6 +81,7 @@ CAPTCHA_ACTIONABLE_STATUSES = (
     JobStatus.BLOCKED,
     JobStatus.FAILED,
 )
+REVIEW_PAGE_SIZE = 100
 
 app = FastAPI(title="Project DM Dashboard")
 app.mount(
@@ -205,20 +206,18 @@ def _job_progress_url(job: Job, session) -> str | None:
     if job.job_type != JobType.REVIEWS.value:
         return job.target_url
 
-    family = session.get(ProductFamily, job.family_id) if job.family_id else None
-    limit = max(
-        (
-            job.total_expected
-            or (family.review_count if family is not None else None)
-            or 10
-        )
-        - job.current_offset,
-        1,
-    )
     return build_reviews_url(
         job.target_url,
         offset=job.current_offset,
-        limit=limit,
+    )
+
+
+def _job_next_review_url(job: Job) -> str | None:
+    if job.target_url is None:
+        return None
+    return build_reviews_url(
+        job.target_url,
+        offset=job.current_offset + REVIEW_PAGE_SIZE,
     )
 
 
@@ -236,6 +235,7 @@ def _captcha_job_row(session, job: Job) -> dict[str, object]:
         "brand_slug": brand_slug,
         "family_name": family_name,
         "open_url": _job_progress_url(job, session),
+        "next_open_url": _job_next_review_url(job),
     }
 
 
@@ -915,6 +915,8 @@ def captcha_review_job(
             job=row["job"],
             job_row=row,
             open_url=row["open_url"],
+            next_open_url=row["next_open_url"],
+            review_page_size=REVIEW_PAGE_SIZE,
             next_url="/captcha/review",
             stale=bool(stale),
             marked=bool(marked),
@@ -1180,7 +1182,6 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
     if product is None:
         raise HTTPException(status_code=404, detail="Product family not found")
     family = product["family"]
-    review_limit = min(max((family.review_count or 10), 10), 1000)
     return templates.TemplateResponse(
         request,
         "product_detail.html",
@@ -1192,7 +1193,6 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
             reviews_url=build_reviews_url(
                 family.url,
                 offset=0,
-                limit=review_limit,
             ),
             scrape_reviews_endpoint=f"/products/{family_id}/scrape-reviews",
         ),

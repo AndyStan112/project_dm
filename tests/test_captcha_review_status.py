@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager, nullcontext
 
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 from project_dm.web import app as web_app
 
@@ -82,6 +83,68 @@ def test_open_captcha_review_clears_stale_error(monkeypatch) -> None:
     assert response.status_code == 303
     assert response.headers["location"] == "https://example.invalid/review"
     assert fake_session.job.last_error is None
+
+
+def test_captcha_review_job_exposes_next_page_url(monkeypatch) -> None:
+    class FakeJob:
+        def __init__(self) -> None:
+            self.id = 313
+            self.job_type = "reviews"
+            self.status = "running"
+            self.current_offset = 100
+            self.target_url = "https://www.emag.ro/example/pd/ABC123/"
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.job = FakeJob()
+
+        def get(self, model, job_id, with_for_update=False):  # noqa: ANN001
+            return self.job if job_id == self.job.id else None
+
+        def begin(self):
+            return nullcontext()
+
+        def flush(self) -> None:
+            pass
+
+    fake_session = FakeSession()
+
+    @contextmanager
+    def fake_write_session():
+        yield fake_session
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(web_app, "_activate_captcha_job", lambda session, job: job)
+    monkeypatch.setattr(
+        web_app,
+        "_captcha_job_row",
+        lambda session, job: {
+            "job": job,
+            "brand_slug": "example",
+            "family_name": "Example",
+            "open_url": "https://www.emag.ro/example/pd/ABC123/reviews/list?page[offset]=100&page[limit]=100",
+            "next_open_url": web_app.build_reviews_url(
+                "https://www.emag.ro/example/pd/ABC123/",
+                offset=200,
+            ),
+        },
+    )
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/captcha/review/313",
+            "headers": [],
+            "app": web_app.app,
+            "router": web_app.app.router,
+        }
+    )
+    response = web_app.captcha_review_job(request, 313)
+
+    assert response.status_code == 200
+    assert response.context["review_page_size"] == 100
+    assert "page%5Boffset%5D=200" in response.context["next_open_url"]
 
 
 def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> None:

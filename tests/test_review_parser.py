@@ -10,12 +10,11 @@ def test_build_reviews_url_uses_item_offset() -> None:
     url = build_reviews_url(
         "https://www.emag.ro/test-phone/pd/ABC123/#reviews",
         offset=20,
-        limit=10,
     )
 
     assert "/product-feedback/test-phone/pd/ABC123/reviews/list?" in url
     assert "page%5Boffset%5D=20" in url
-    assert "page%5Blimit%5D=10" in url
+    assert "page%5Blimit%5D=100" in url
     assert "pnk=ABC123" in url
 
 

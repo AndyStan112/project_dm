@@ -14,7 +14,10 @@ PRODUCT_PATH_PATTERN = re.compile(
 
 
 def build_reviews_url(
-    product_url: str, *, offset: int, limit: int = 10
+    product_url: str,
+    *,
+    offset: int,
+    limit: int = 100,
 ) -> str:
     parsed = urlparse(product_url)
     match = PRODUCT_PATH_PATTERN.match(parsed.path)

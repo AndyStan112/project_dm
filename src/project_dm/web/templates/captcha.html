@@ -154,6 +154,9 @@
       {% if open_url %}
       <a class="button" href="/captcha/review/{{ job.id }}/open">Validate exact review URL</a>
       {% endif %}
+      {% if next_open_url %}
+      <a class="button secondary" href="{{ next_open_url }}">Open next page</a>
+      {% endif %}
       <a class="button secondary" href="/captcha/review/{{ job.id }}/browser">Solve in server browser (VNC)</a>
       <button class="button secondary" id="debug-button" type="button" title="Show job state" aria-label="Show job state">i</button>
       <button class="button secondary" id="status-button" type="button">Check progress</button>
@@ -167,9 +170,30 @@
     {% if marked %}
     Review marked unrecoverable. Loading the next review.
     {% else %}
-    Validate the exact review URL in a normal tab, or open the server browser to solve the CAPTCHA there. This page polls live progress.
+    Open the exact review page, copy the JSON, paste it below, and import it. Use the next page link to advance by {{ review_page_size }} reviews at a time.
     {% endif %}
   </p>
+  <div class="panel" style="margin-top: 16px;">
+    <div class="panel-heading">
+      <div><p class="eyebrow">Import</p><h2>Paste review JSON</h2></div>
+      <span class="panel-tag">Page size {{ review_page_size }}</span>
+    </div>
+    <form id="review-import-form" class="inline-form">
+      <label style="display: grid; gap: 8px; width: 100%;">
+        Paste the JSON from the review page here
+        <textarea id="review-import-payload" rows="12" placeholder='{"response": {"code": 200}, "reviews": {...}}' required></textarea>
+      </label>
+      <div class="solve-actions">
+        <button class="button" type="submit" id="review-import-button">Import pasted JSON</button>
+        {% if open_url %}
+        <a class="button secondary" href="/captcha/review/{{ job.id }}/open">Open current page</a>
+        {% endif %}
+        {% if next_open_url %}
+        <a class="button secondary" href="{{ next_open_url }}">Open next page</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
   <pre class="debug-panel" id="job-debug" hidden></pre>
   {% else %}
   <div class="empty-state">No actionable review jobs right now. The review queue is exhausted.</div>
@@ -183,12 +207,16 @@
 (function () {
   const statusEndpoint = "/api/captcha/review/{{ job.id }}";
   const debugEndpoint = "/api/captcha/review/{{ job.id }}/debug";
+  const importEndpoint = "/captcha/review/{{ job.id }}";
   const status = document.getElementById("solve-status");
   const progressBar = document.getElementById("review-progress-bar");
   const progressText = document.getElementById("review-progress-text");
   const debugButton = document.getElementById("debug-button");
   const debugPanel = document.getElementById("job-debug");
   const button = document.getElementById("status-button");
+  const importForm = document.getElementById("review-import-form");
+  const importButton = document.getElementById("review-import-button");
+  const importPayload = document.getElementById("review-import-payload");
   let lastState = null;
   let completedNotified = false;
   let debugLoaded = false;
@@ -199,6 +227,12 @@
 
   const setDebug = (message) => {
     debugPanel.textContent = message;
+  };
+
+  const reportImportError = (error) => {
+    setStatus(
+      `Import failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   };
 
   const render = (state) => {
@@ -260,6 +294,39 @@
       }
     }
   };
+
+  if (importForm && importButton && importPayload) {
+    importForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      importButton.disabled = true;
+      try {
+        setStatus("Importing pasted JSON...");
+        const payload = JSON.parse(importPayload.value);
+        const response = await fetch(importEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const detail = await response.text();
+          throw new Error(
+            `Import failed with HTTP ${response.status}: ${detail}`,
+          );
+        }
+        const result = await response.json();
+        setStatus(`Imported ${result.reviews_seen} reviews from pasted JSON.`);
+        await refresh(false);
+      } catch (error) {
+        console.error(error);
+        reportImportError(error);
+      } finally {
+        importButton.disabled = false;
+      }
+    });
+  }
 
   button.addEventListener("click", () => refresh(true));
   debugButton.addEventListener("click", async () => {
