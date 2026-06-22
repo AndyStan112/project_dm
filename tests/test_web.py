@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
+import json
 import os
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from starlette.requests import Request
 
 from project_dm.db import read_session
 from project_dm.models import ProductFamily
+from project_dm.web import app as web_app
 from project_dm.web.app import app
 
 
@@ -41,6 +46,101 @@ def test_dashboard_filters_and_product_detail_render() -> None:
         assert "Known variants" in response.text
 
 
+def test_product_detail_exposes_scrape_reviews_button(monkeypatch) -> None:
+    @contextmanager
+    def fake_read_session():
+        yield object()
+
+    family = SimpleNamespace(
+        id=58,
+        name="Example Phone",
+        url="https://www.emag.ro/example-phone/pd/ABC123/",
+        aggregate_rating=None,
+        review_count=123,
+        description=None,
+        emag_family_id=88,
+    )
+    product = {"family": family, "brand_slug": "example", "variants": []}
+
+    monkeypatch.setattr(web_app, "read_session", fake_read_session)
+    monkeypatch.setattr(web_app, "family_detail", lambda session, family_id: product)
+    monkeypatch.setattr(web_app, "list_reviews", lambda session, **kwargs: [])
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/products/58",
+            "headers": [],
+            "app": web_app.app,
+            "router": web_app.app.router,
+        }
+    )
+    response = web_app.product_detail(request, 58)
+
+    assert response.status_code == 200
+    assert "product-feedback/example-phone/pd/ABC123/reviews/list?" in response.context[
+        "reviews_url"
+    ]
+    assert response.context["scrape_reviews_endpoint"] == "/products/58/scrape-reviews"
+
+
+def test_scrape_product_reviews_imports_payload(monkeypatch) -> None:
+    class FakeFamily:
+        def __init__(self) -> None:
+            self.review_count = 12
+            self.scraped_at = None
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.family = FakeFamily()
+
+        def get(self, model, family_id, with_for_update=False):  # noqa: ANN001
+            return self.family if family_id == 58 else None
+
+        def begin(self):
+            return nullcontext()
+
+        def flush(self) -> None:
+            pass
+
+    fake_session = FakeSession()
+    calls: list[tuple[int, dict[str, object]]] = []
+
+    @contextmanager
+    def fake_write_session():
+        yield fake_session
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(
+        web_app,
+        "import_review_payload",
+        lambda session, family_id, payload: calls.append((family_id, payload))
+        or (7, 222),
+    )
+
+    response = web_app.scrape_product_reviews(
+        58,
+        {"response": {"code": 200}, "reviews": {"count": 222, "items": []}},
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body) == {
+        "family_id": 58,
+        "reviews_seen": 7,
+        "review_count": 222,
+        "message": "Browser-fetched reviews imported.",
+    }
+    assert calls == [
+        (
+            58,
+            {"response": {"code": 200}, "reviews": {"count": 222, "items": []}},
+        )
+    ]
+    assert fake_session.family.review_count == 222
+    assert fake_session.family.scraped_at is not None
+
+
 def test_worker_controls_render_and_update() -> None:
     if not os.getenv("DATABASE_URL_WRITE"):
         pytest.skip("DATABASE_URL_WRITE is not configured")
@@ -53,6 +153,62 @@ def test_worker_controls_render_and_update() -> None:
             "/service-controls/scraper/start", follow_redirects=False
         ).status_code
         == 303
+    )
+
+
+def test_workers_route_separates_blocked_and_failed_jobs(monkeypatch) -> None:
+    @contextmanager
+    def fake_read_session():
+        yield object()
+
+    def make_job(job_id: int, status: str, message: str) -> dict[str, object]:
+        return {
+            "job": SimpleNamespace(
+                id=job_id,
+                job_type="reviews",
+                status=status,
+                target_url="https://example.invalid",
+                current_offset=0,
+                total_expected=None,
+                attempts=1,
+                last_error=message,
+            ),
+            "brand_slug": None,
+            "family_name": "Example Family",
+        }
+
+    monkeypatch.setattr(web_app, "read_session", fake_read_session)
+    monkeypatch.setattr(web_app, "list_service_controls", lambda session: [])
+    monkeypatch.setattr(
+        web_app,
+        "recent_blocked_jobs",
+        lambda session: [make_job(101, "blocked", "Needs captcha")],
+    )
+    monkeypatch.setattr(
+        web_app,
+        "recent_failed_jobs",
+        lambda session: [
+            make_job(202, "failed", "Marked unrecoverable by user.")
+        ],
+    )
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/workers",
+            "headers": [],
+            "app": web_app.app,
+            "router": web_app.app.router,
+        }
+    )
+    response = web_app.workers(request)
+
+    assert response.status_code == 200
+    assert [row["job"].id for row in response.context["blocked_jobs"]] == [101]
+    assert [row["job"].id for row in response.context["failed_jobs"]] == [202]
+    assert response.context["failed_jobs"][0]["job"].last_error == (
+        "Marked unrecoverable by user."
     )
 
 

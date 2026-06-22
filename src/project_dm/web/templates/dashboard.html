@@ -73,6 +73,35 @@
   </div>
 </section>
 
+<section class="panel notice-panel" id="failed-alert-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Finished</p><h2>Failed jobs are done</h2></div>
+    <span class="panel-tag" id="failed-alert-count">{{ failed_jobs|length }} done</span>
+  </div>
+  <div class="alert-list" id="failed-alert-list">
+    {% if failed_jobs %}
+      {% for row in failed_jobs %}
+      {% set job = row.job %}
+      <article class="blocked-card">
+        <div>
+          <strong>#{{ job.id }} {{ job.job_type }}</strong>
+          <small>{{ row.family_name or row.brand_slug or "Unassigned" }}</small>
+          <p>{{ job.last_error or "No error message recorded." }}</p>
+        </div>
+        <div class="blocked-actions">
+          {% if job.target_url %}
+          <a class="button secondary" href="{{ job.target_url }}">Open target</a>
+          {% endif %}
+          <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
+        </div>
+      </article>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">No failed jobs right now.</div>
+    {% endif %}
+  </div>
+</section>
+
 <section class="two-column">
   <article class="panel">
     <div class="panel-heading">
@@ -185,6 +214,8 @@
     blocked: document.getElementById("metric-blocked"),
     blockedAlertCount: document.getElementById("blocked-alert-count"),
     blockedAlertList: document.getElementById("blocked-alert-list"),
+    failedAlertCount: document.getElementById("failed-alert-count"),
+    failedAlertList: document.getElementById("failed-alert-list"),
     ratingTotal: document.getElementById("rating-total"),
     ratingChart: document.getElementById("rating-chart"),
     jobGrid: document.getElementById("job-status-grid"),
@@ -252,6 +283,29 @@
     `).join("");
   };
 
+  const renderFailedAlerts = (failedJobs) => {
+    if (!metrics.failedAlertList) return;
+    if (!failedJobs.length) {
+      metrics.failedAlertCount.textContent = "0 done";
+      metrics.failedAlertList.innerHTML = '<div class="empty-state">No failed jobs right now.</div>';
+      return;
+    }
+    metrics.failedAlertCount.textContent = `${failedJobs.length} done`;
+    metrics.failedAlertList.innerHTML = failedJobs.map((job) => `
+      <article class="blocked-card">
+        <div>
+          <strong>#${escapeHtml(job.id)} ${escapeHtml(job.job_type)}</strong>
+          <small>${escapeHtml(job.family_name || job.brand_slug || "Unassigned")}</small>
+          <p>${escapeHtml(job.last_error || "No error message recorded.")}</p>
+        </div>
+        <div class="blocked-actions">
+          ${job.target_url ? `<a class="button secondary" href="${escapeHtml(job.target_url)}">Open target</a>` : ""}
+          <a class="button secondary" href="/jobs/${encodeURIComponent(job.id)}/diagnostics">Diagnostics</a>
+        </div>
+      </article>
+    `).join("");
+  };
+
   const renderRecentJobs = (jobs) => {
     if (!metrics.jobs) return;
     if (!jobs.length) {
@@ -309,6 +363,7 @@
       const nextBlockedIds = new Set(data.blocked_jobs.map((row) => row.id));
       const newlyBlocked = data.blocked_jobs.filter((row) => !blockedIds.has(row.id));
       renderBlockedAlerts(data.blocked_jobs);
+      renderFailedAlerts(data.failed_jobs || []);
       renderRecentJobs(data.recent_jobs);
       if (newlyBlocked.length && "Notification" in window && Notification.permission === "granted") {
         const row = newlyBlocked[0];

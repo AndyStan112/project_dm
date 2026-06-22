@@ -31,6 +31,7 @@ from project_dm.repositories.dashboard import (
     list_reviews,
     rating_counts,
     recent_blocked_jobs,
+    recent_failed_jobs,
     recent_jobs,
     review_summary,
 )
@@ -52,6 +53,7 @@ from project_dm.workers.listing import run_one_listing_job
 from project_dm.workers.product import run_product_jobs
 from project_dm.workers.reviews import (
     apply_review_payload,
+    import_review_payload,
     run_one_review_job,
 )
 from project_dm.workers.supervisor import (
@@ -132,6 +134,21 @@ def _dashboard_payload(session) -> dict[str, object]:
                 "brand_slug": row["brand_slug"],
             }
             for row in recent_blocked_jobs(session)
+        ],
+        "failed_jobs": [
+            {
+                "id": row["job"].id,
+                "job_type": row["job"].job_type,
+                "status": row["job"].status,
+                "target_url": row["job"].target_url,
+                "current_offset": row["job"].current_offset,
+                "total_expected": row["job"].total_expected,
+                "attempts": row["job"].attempts,
+                "last_error": row["job"].last_error,
+                "family_name": row["family_name"],
+                "brand_slug": row["brand_slug"],
+            }
+            for row in recent_failed_jobs(session)
         ],
         "worker_status": [
             {
@@ -515,6 +532,7 @@ def workers(
             for control in list_service_controls(session)
         }
         blocked_jobs = recent_blocked_jobs(session)
+        failed_jobs = recent_failed_jobs(session)
     rows: list[dict[str, object]] = []
     for service_name in SERVICE_NAMES:
         control = existing.get(service_name)
@@ -544,6 +562,7 @@ def workers(
             active="workers",
             controls=rows,
             blocked_jobs=blocked_jobs,
+            failed_jobs=failed_jobs,
             worker_daemon_online=any(
                 row["last_heartbeat_at"] is not None for row in rows
             ),
@@ -1160,6 +1179,8 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
         reviews = list_reviews(session, family_id=family_id, limit=50)
     if product is None:
         raise HTTPException(status_code=404, detail="Product family not found")
+    family = product["family"]
+    review_limit = min(max((family.review_count or 10), 10), 1000)
     return templates.TemplateResponse(
         request,
         "product_detail.html",
@@ -1168,6 +1189,12 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
             active="products",
             product=product,
             reviews=reviews,
+            reviews_url=build_reviews_url(
+                family.url,
+                offset=0,
+                limit=review_limit,
+            ),
+            scrape_reviews_endpoint=f"/products/{family_id}/scrape-reviews",
         ),
     )
 
@@ -1212,6 +1239,33 @@ def reviews(
             verified=verified,
             helpful=helpful,
         ),
+    )
+
+
+@app.post("/products/{family_id}/scrape-reviews")
+def scrape_product_reviews(
+    family_id: int,
+    payload: dict[str, object] = Body(...),
+) -> JSONResponse:
+    with write_session() as session, session.begin():
+        family = session.get(ProductFamily, family_id, with_for_update=True)
+        if family is None:
+            raise HTTPException(status_code=404, detail="Product family not found")
+        reviews_seen, review_count = import_review_payload(
+            session,
+            family_id=family_id,
+            payload=payload,
+        )
+        if review_count:
+            family.review_count = review_count
+        family.scraped_at = datetime.now(UTC)
+    return JSONResponse(
+        {
+            "family_id": family_id,
+            "reviews_seen": reviews_seen,
+            "review_count": review_count,
+            "message": "Browser-fetched reviews imported.",
+        }
     )
 
 

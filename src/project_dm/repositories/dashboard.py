@@ -96,7 +96,22 @@ def recent_blocked_jobs(session: Session, *, limit: int = 5) -> list[dict]:
         select(Job, Brand.slug, ProductFamily.name)
         .outerjoin(Brand, Brand.id == Job.brand_id)
         .outerjoin(ProductFamily, ProductFamily.id == Job.family_id)
-        .where(Job.status.in_(("blocked", "failed")))
+        .where(Job.status == "blocked")
+        .order_by(Job.updated_at.desc())
+        .limit(limit)
+    )
+    return [
+        {"job": job, "brand_slug": brand_slug, "family_name": family_name}
+        for job, brand_slug, family_name in rows
+    ]
+
+
+def recent_failed_jobs(session: Session, *, limit: int = 5) -> list[dict]:
+    rows = session.execute(
+        select(Job, Brand.slug, ProductFamily.name)
+        .outerjoin(Brand, Brand.id == Job.brand_id)
+        .outerjoin(ProductFamily, ProductFamily.id == Job.family_id)
+        .where(Job.status == "failed")
         .order_by(Job.updated_at.desc())
         .limit(limit)
     )

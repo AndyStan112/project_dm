@@ -54,6 +54,33 @@
 </section>
 {% endif %}
 
+{% if failed_jobs %}
+<section class="panel notice-panel">
+  <div class="panel-heading">
+    <div><p class="eyebrow">Failed</p><h2>Finished with an error</h2></div>
+    <span class="panel-tag">{{ failed_jobs|length }} done</span>
+  </div>
+  <div class="alert-list">
+    {% for row in failed_jobs %}
+    {% set job = row.job %}
+    <article class="blocked-card">
+      <div>
+        <strong>#{{ job.id }} {{ job.job_type }}</strong>
+        <small>{{ row.family_name or row.brand_slug or "Unassigned" }}</small>
+        <p>{{ job.last_error or "No error message recorded." }}</p>
+      </div>
+      <div class="blocked-actions">
+        {% if job.target_url %}
+        <a class="button secondary" href="{{ job.target_url }}">Open target</a>
+        {% endif %}
+        <a class="button secondary" href="/jobs/{{ job.id }}/diagnostics">Diagnostics</a>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
 <section class="two-column">
   <article class="panel">
     <div class="panel-heading">

@@ -3,7 +3,11 @@
 {% block title %}{{ family.name }} · Project DM{% endblock %}
 {% block heading %}{{ family.name }}{% endblock %}
 {% block eyebrow %}{{ product.brand_slug }} · family {{ family.emag_family_id }}{% endblock %}
-{% block actions %}<a class="button secondary" href="{{ family.url }}">Open on eMAG</a><a class="button" href="/reviews?q={{ family.name | urlencode }}">Search reviews</a>{% endblock %}
+{% block actions %}
+  <a class="button secondary" href="{{ family.url }}">Open on eMAG</a>
+  <a class="button" href="/reviews?q={{ family.name | urlencode }}">Search reviews</a>
+  <button class="button secondary" type="button" id="scrape-reviews-button">Scrape reviews</button>
+{% endblock %}
 {% block content %}
 <section class="detail-grid">
   <article class="panel">
@@ -14,6 +18,7 @@
       <div><strong>{{ family.review_count or 0 }}</strong><small>eMAG reviews</small></div>
       <div><strong>{{ reviews|length }}</strong><small>shown below</small></div>
     </div>
+    <p class="hint" id="scrape-reviews-status">Use the button above to fetch the latest review JSON in your browser and import it into Project DM.</p>
   </article>
   <article class="panel">
     <div class="panel-heading"><div><p class="eyebrow">Distribution</p><h2>Ratings</h2></div></div>
@@ -29,4 +34,64 @@
   <div class="panel-heading"><div><p class="eyebrow">Sample</p><h2>Latest collected reviews</h2></div><a class="text-link" href="/reviews?q={{ family.name | urlencode }}">See matching reviews</a></div>
   <div class="review-list">{% for row in reviews %}{% include "_review_card.html" %}{% else %}<div class="empty-state">No reviews collected for this family yet.</div>{% endfor %}</div>
 </section>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const button = document.getElementById("scrape-reviews-button");
+  const status = document.getElementById("scrape-reviews-status");
+  if (!button || !status) return;
+
+  const reviewsUrl = {{ reviews_url | tojson }};
+  const importEndpoint = {{ scrape_reviews_endpoint | tojson }};
+
+  const setStatus = (message) => {
+    status.textContent = message;
+  };
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      setStatus("Fetching reviews locally in your browser...");
+      const response = await fetch(reviewsUrl, {
+        cache: "no-store",
+        credentials: "omit",
+      });
+      if (!response.ok) {
+        throw new Error(`Review endpoint returned HTTP ${response.status}.`);
+      }
+      const payload = await response.json();
+      setStatus("Sending review payload to Project DM...");
+      const importResponse = await fetch(importEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!importResponse.ok) {
+        const detail = await importResponse.text();
+        throw new Error(
+          `Import failed with HTTP ${importResponse.status}: ${detail}`,
+        );
+      }
+      const result = await importResponse.json();
+      setStatus(`Imported ${result.reviews_seen} reviews from the browser.`);
+      if (window.ProjectDMPWA && typeof window.ProjectDMPWA.notify === "function") {
+        await window.ProjectDMPWA.notify("Reviews imported", {
+          body: `Imported ${result.reviews_seen} reviews for this family.`,
+        });
+      }
+    } catch (error) {
+      console.error("Scrape reviews failed", error);
+      setStatus(
+        `Scrape failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      button.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}

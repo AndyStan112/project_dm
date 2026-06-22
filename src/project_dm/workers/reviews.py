@@ -111,6 +111,41 @@ def apply_review_payload(
     payload: dict[str, object],
 ) -> tuple[int, int, JobStatus]:
     review_page = parse_review_page(payload)
+    reviews_seen = _persist_review_page(
+        session,
+        family_id=family_id,
+        review_page=review_page,
+    )
+    checkpoint = checkpoint_review_page(
+        session,
+        job_id=job_id,
+        reviews_seen=reviews_seen,
+        total_expected=review_page.total_count,
+    )
+    return reviews_seen, checkpoint.current_offset, JobStatus(checkpoint.status)
+
+
+def import_review_payload(
+    session,
+    *,
+    family_id: int,
+    payload: dict[str, object],
+) -> tuple[int, int]:
+    review_page = parse_review_page(payload)
+    reviews_seen = _persist_review_page(
+        session,
+        family_id=family_id,
+        review_page=review_page,
+    )
+    return reviews_seen, review_page.total_count
+
+
+def _persist_review_page(
+    session,
+    *,
+    family_id: int,
+    review_page,
+) -> int:
     for review in review_page.reviews:
         variant_id = find_variant_id(
             session,
@@ -126,15 +161,7 @@ def apply_review_payload(
                 **values,
             ),
         )
-    checkpoint = checkpoint_review_page(
-        session,
-        job_id=job_id,
-        reviews_seen=len(review_page.reviews),
-        total_expected=review_page.total_count,
-    )
-    return len(review_page.reviews), checkpoint.current_offset, JobStatus(
-        checkpoint.status
-    )
+    return len(review_page.reviews)
 
 
 def run_one_review_job(
