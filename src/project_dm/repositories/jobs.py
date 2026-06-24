@@ -377,6 +377,7 @@ def checkpoint_review_page(
     job_id: int,
     reviews_seen: int,
     total_expected: int,
+    page_size: int | None = None,
 ) -> Job:
     job = session.get(Job, job_id, with_for_update=True)
     if job is None:
@@ -388,11 +389,17 @@ def checkpoint_review_page(
         return job
 
     job.current_offset += reviews_seen
-    job.total_expected = total_expected
     job.locked_at = None
-    if reviews_seen == 0 or job.current_offset >= total_expected:
+    is_short_page = page_size is not None and 0 < reviews_seen < page_size
+    if reviews_seen == 0 or is_short_page:
+        job.total_expected = job.current_offset
         job.status = JobStatus.COMPLETED.value
         job.finished_at = datetime.now(UTC)
+    else:
+        job.total_expected = total_expected
+        if job.current_offset >= total_expected:
+            job.status = JobStatus.COMPLETED.value
+            job.finished_at = datetime.now(UTC)
     session.flush()
     return job
 

@@ -215,6 +215,14 @@ def _job_progress_url(job: Job, session) -> str | None:
 def _job_next_review_url(job: Job) -> str | None:
     if job.target_url is None:
         return None
+    if (
+        job.status == JobStatus.COMPLETED.value
+        or (
+            job.total_expected is not None
+            and job.current_offset >= job.total_expected
+        )
+    ):
+        return None
     return build_reviews_url(
         job.target_url,
         offset=job.current_offset + REVIEW_PAGE_SIZE,
@@ -1065,6 +1073,7 @@ def _submit_review_payload(
             job_id=job.id,
             family_id=job.family_id,
             payload=payload,
+            page_size=REVIEW_PAGE_SIZE,
         )
         if checkpoint_status is JobStatus.COMPLETED:
             message = f"Manual solve imported {reviews_seen} reviews and completed the job."

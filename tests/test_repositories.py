@@ -11,6 +11,7 @@ from project_dm.brands import normalize_brand
 from project_dm.db import DatabaseRole, engine
 from project_dm.repositories.brands import upsert_brand
 from project_dm.repositories.jobs import (
+    create_job,
     checkpoint_listing_page,
     checkpoint_review_page,
     claim_pending_job,
@@ -31,6 +32,7 @@ from project_dm.repositories.reviews import (
     upsert_review,
 )
 from project_dm.schemas import (
+    JobCreate,
     JobStatus,
     JobType,
     ListingProduct,
@@ -239,6 +241,29 @@ def test_brand_and_listing_job_are_idempotent() -> None:
                 completed_review_job.status == JobStatus.COMPLETED.value
             )
             assert completed_review_job.current_offset == 12
+
+            short_page_job = create_job(
+                session,
+                JobCreate(
+                    job_type=JobType.REVIEWS,
+                    family_id=family.id,
+                    target_url="https://example.invalid",
+                    current_offset=480,
+                    total_expected=530,
+                ),
+            )
+            short_page_job.status = JobStatus.RUNNING.value
+            session.flush()
+            short_page_checkpoint = checkpoint_review_page(
+                session,
+                job_id=short_page_job.id,
+                reviews_seen=30,
+                total_expected=530,
+                page_size=100,
+            )
+            assert short_page_checkpoint.status == JobStatus.COMPLETED.value
+            assert short_page_checkpoint.current_offset == 510
+            assert short_page_checkpoint.total_expected == 510
 
             completed = complete_product_job(
                 session, job_id=first_product_job.id, family_id=family.id

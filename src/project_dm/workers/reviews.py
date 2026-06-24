@@ -109,6 +109,7 @@ def apply_review_payload(
     job_id: int,
     family_id: int,
     payload: dict[str, object],
+    page_size: int | None = None,
 ) -> tuple[int, int, JobStatus]:
     review_page = parse_review_page(payload)
     reviews_seen = _persist_review_page(
@@ -121,6 +122,7 @@ def apply_review_payload(
         job_id=job_id,
         reviews_seen=reviews_seen,
         total_expected=review_page.total_count,
+        page_size=page_size,
     )
     return reviews_seen, checkpoint.current_offset, JobStatus(checkpoint.status)
 
@@ -486,6 +488,7 @@ def run_one_review_job(
                         job_id=job_id,
                         family_id=family_id,
                         payload=payload,
+                        page_size=effective_page_size,
                     )
                 )
 
