@@ -16,6 +16,7 @@ APPLICATION_TABLES = (
     "service_controls",
     "avatar_results",
     "nlp_results",
+    "product_recommendations",
 )
 
 

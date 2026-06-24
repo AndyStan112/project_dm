@@ -12,6 +12,7 @@ from project_dm.repositories.service_controls import (
     update_service_control_state,
 )
 from project_dm.schemas import JobStatus
+from project_dm.workers.nlp import run_nlp_batch
 from project_dm.workers.listing import run_one_listing_job
 from project_dm.workers.product import run_product_jobs
 from project_dm.workers.reviews import run_one_review_job
@@ -114,10 +115,27 @@ def _idle_cycle(service_name: str, desired_state: str) -> CycleResult:
     )
 
 
+def _nlp_cycle() -> CycleResult:
+    result = run_nlp_batch(limit=500)
+    if result.reviews_processed == 0:
+        return CycleResult(
+            current_state=JobStatus.RUNNING.value,
+            current_job_id=None,
+            message=result.message,
+        )
+    return CycleResult(
+        current_state=JobStatus.RUNNING.value,
+        current_job_id=None,
+        message=result.message,
+    )
+
+
 def _service_cycle(service_name: str, desired_state: str) -> CycleResult:
     if desired_state == JobStatus.RUNNING.value:
         if service_name == "scraper":
             return _scraper_cycle()
+        if service_name == "nlp":
+            return _nlp_cycle()
         return _idle_cycle(service_name, desired_state)
     return CycleResult(
         current_state=desired_state,

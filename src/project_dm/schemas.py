@@ -130,6 +130,24 @@ class ParsedReviewPage(BaseModel):
     reviews: list[ParsedReview]
 
 
+class TfidfTerm(BaseModel):
+    term: str = Field(min_length=1)
+    score: float = Field(ge=0)
+
+
+class NlpResultCreate(BaseModel):
+    review_id: int
+    cleaned_text: str = Field(min_length=1)
+    language: str | None = Field(default=None, max_length=20)
+    sentiment_label: str | None = Field(default=None, max_length=20)
+    sentiment_score: float | None = Field(default=None, ge=0, le=1)
+    rating_mismatch: bool | None = None
+    token_count: int = Field(default=0, ge=0)
+    unique_token_count: int = Field(default=0, ge=0)
+    tfidf_terms: list[TfidfTerm] = Field(default_factory=list)
+    model_name: str | None = Field(default=None, max_length=200)
+
+
 class ReviewCreate(BaseModel):
     emag_review_id: int
     family_id: int

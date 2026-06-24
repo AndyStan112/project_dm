@@ -13,6 +13,7 @@ from project_dm.repositories.jobs import (
 )
 from project_dm.schemas import BrandRead, JobRead, JobStatus
 from project_dm.workers.listing import run_one_listing_job
+from project_dm.workers.nlp import run_nlp_batch
 from project_dm.workers.product import run_product_jobs
 from project_dm.workers.reviews import run_one_review_job
 
@@ -223,6 +224,22 @@ def run_review_worker(
         f"pages={result.pages_processed} "
         f"reviews={result.reviews_upserted} "
         f"message={result.message}"
+    )
+
+
+@worker_app.command("nlp")
+def run_nlp_worker(
+    limit: int | None = typer.Option(
+        default=None,
+        min=1,
+        help="Process at most this many reviews.",
+    ),
+    top_k: int = typer.Option(default=12, min=1, max=50),
+) -> None:
+    """Process reviews into persisted NLP and TF-IDF records."""
+    result = run_nlp_batch(limit=limit, top_k=top_k)
+    typer.echo(
+        f"reviews={result.reviews_processed} message={result.message}"
     )
 
 

@@ -35,6 +35,10 @@ from project_dm.repositories.dashboard import (
     recent_jobs,
     review_summary,
 )
+from project_dm.repositories.recommendations import (
+    recommendations_for_family,
+    regenerate_product_recommendations,
+)
 from project_dm.repositories.jobs import (
     get_or_create_brand_listing_job,
     fail_job,
@@ -50,6 +54,7 @@ from project_dm.repositories.service_controls import (
 )
 from project_dm.schemas import JobStatus, JobType
 from project_dm.workers.listing import run_one_listing_job
+from project_dm.workers.nlp import run_nlp_batch
 from project_dm.workers.product import run_product_jobs
 from project_dm.workers.reviews import (
     apply_review_payload,
@@ -1215,6 +1220,8 @@ def _run_worker(
         run_product_jobs(attended_browser=attended_browser)
     elif worker == "reviews":
         run_one_review_job(attended_browser=attended_browser)
+    elif worker == "nlp":
+        run_nlp_batch()
 
 
 @app.post("/workers/{worker}/run")
@@ -1229,7 +1236,7 @@ def run_worker(
         file=sys.stderr,
         flush=True,
     )
-    if worker not in {"listing", "product", "reviews"}:
+    if worker not in {"listing", "product", "reviews", "nlp"}:
         raise HTTPException(status_code=400, detail="Unsupported worker")
     if max_pages is not None and max_pages < 1:
         raise HTTPException(status_code=422, detail="max_pages must be positive")
@@ -1284,6 +1291,11 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
     with read_session() as session:
         product = family_detail(session, family_id)
         reviews = list_reviews(session, family_id=family_id, limit=50)
+        recommendations = recommendations_for_family(
+            session,
+            family_id=family_id,
+            limit=6,
+        )
     if product is None:
         raise HTTPException(status_code=404, detail="Product family not found")
     family = product["family"]
@@ -1295,6 +1307,7 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
             active="products",
             product=product,
             reviews=reviews,
+            recommendations=recommendations,
             reviews_url=build_reviews_url(
                 family.url,
                 offset=0,
@@ -1302,6 +1315,15 @@ def product_detail(request: Request, family_id: int) -> HTMLResponse:
             scrape_reviews_endpoint=f"/products/{family_id}/scrape-reviews",
         ),
     )
+
+
+@app.post("/products/{family_id}/recommendations/regenerate")
+def regenerate_product_recommendations_view(
+    family_id: int,
+) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        regenerate_product_recommendations(session)
+    return RedirectResponse(f"/products/{family_id}", status_code=303)
 
 
 def _optional_bool(value: str) -> bool | None:

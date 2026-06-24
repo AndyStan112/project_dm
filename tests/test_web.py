@@ -65,6 +65,11 @@ def test_product_detail_exposes_scrape_reviews_button(monkeypatch) -> None:
     monkeypatch.setattr(web_app, "read_session", fake_read_session)
     monkeypatch.setattr(web_app, "family_detail", lambda session, family_id: product)
     monkeypatch.setattr(web_app, "list_reviews", lambda session, **kwargs: [])
+    monkeypatch.setattr(
+        web_app,
+        "recommendations_for_family",
+        lambda session, **kwargs: [],
+    )
 
     request = Request(
         {
@@ -83,6 +88,7 @@ def test_product_detail_exposes_scrape_reviews_button(monkeypatch) -> None:
         "reviews_url"
     ]
     assert response.context["scrape_reviews_endpoint"] == "/products/58/scrape-reviews"
+    assert response.context["recommendations"] == []
 
 
 def test_scrape_product_reviews_imports_payload(monkeypatch) -> None:

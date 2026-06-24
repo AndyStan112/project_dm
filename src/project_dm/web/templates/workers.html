@@ -144,6 +144,7 @@
       <form method="post" action="/workers/reviews/run" class="inline-form">
         <button class="button secondary" type="submit">Review all reviews</button>
       </form>
+      <form method="post" action="/workers/nlp/run"><button class="button secondary">NLP + TF-IDF</button></form>
       <form method="post" action="/workers/reviews/queue-missing"><button class="button">Continue review backlog</button></form>
     </div>
     <p class="hint">Use the captcha workbench for the linear mobile flow. These buttons still run the worker directly, while the scraper service above fans out across {{ scraper_lane_count }} parallel lanes.</p>

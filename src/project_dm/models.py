@@ -272,6 +272,13 @@ class NlpResult(TimestampMixin, Base):
     sentiment_label: Mapped[str | None] = mapped_column(String(20))
     sentiment_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 5))
     rating_mismatch: Mapped[bool | None] = mapped_column(Boolean)
+    token_count: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False
+    )
+    unique_token_count: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False
+    )
+    tfidf_terms: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     model_name: Mapped[str | None] = mapped_column(String(200))
 
     __table_args__ = (
@@ -285,4 +292,43 @@ class NlpResult(TimestampMixin, Base):
             "(sentiment_score >= 0 AND sentiment_score <= 1)",
             name="ck_nlp_results_score",
         ),
+        CheckConstraint(
+            "token_count >= 0 AND unique_token_count >= 0",
+            name="ck_nlp_results_token_counts",
+        ),
+    )
+
+
+class ProductRecommendation(TimestampMixin, Base):
+    __tablename__ = "product_recommendations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    source_family_id: Mapped[int] = mapped_column(
+        ForeignKey("product_families.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    recommended_family_id: Mapped[int] = mapped_column(
+        ForeignKey("product_families.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(200), nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ix_product_recommendations_source_family_id",
+            "source_family_id",
+            "rank",
+        ),
+        UniqueConstraint(
+            "source_family_id",
+            "recommended_family_id",
+            name="uq_product_recommendations_pair",
+        ),
+        CheckConstraint(
+            "score >= 0 AND score <= 1",
+            name="ck_product_recommendations_score",
+        ),
+        CheckConstraint("rank >= 1", name="ck_product_recommendations_rank"),
     )
