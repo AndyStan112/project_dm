@@ -231,7 +231,12 @@ def _job_next_review_url(job: Job) -> str | None:
     )
 
 
-def _captcha_job_row(session, job: Job) -> dict[str, object]:
+def _captcha_job_row(
+    session,
+    job: Job,
+    *,
+    include_next_review_url: bool = False,
+) -> dict[str, object]:
     row = session.execute(
         select(Brand.slug, ProductFamily.name)
         .select_from(Job)
@@ -245,7 +250,9 @@ def _captcha_job_row(session, job: Job) -> dict[str, object]:
         "brand_slug": brand_slug,
         "family_name": family_name,
         "open_url": _job_progress_url(job, session),
-        "next_open_url": _job_next_review_url(job),
+        "next_open_url": (
+            _job_next_review_url(job) if include_next_review_url else None
+        ),
     }
 
 
@@ -951,7 +958,11 @@ def captcha_review_job(
                 detail="Job type does not match captcha page",
             )
         job = _activate_captcha_job(session, job)
-        row = _captcha_job_row(session, job)
+        row = _captcha_job_row(
+            session,
+            job,
+            include_next_review_url=True,
+        )
     return templates.TemplateResponse(
         request,
         "captcha.html",
@@ -983,7 +994,11 @@ def open_captcha_review(job_id: int) -> RedirectResponse:
                 status_code=400,
                 detail="Job type does not match captcha page",
             )
-        row = _captcha_job_row(session, job)
+        row = _captcha_job_row(
+            session,
+            job,
+            include_next_review_url=True,
+        )
         review_url = row["open_url"]
         if not review_url:
             raise HTTPException(status_code=400, detail="Job has no review URL")
