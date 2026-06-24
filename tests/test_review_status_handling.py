@@ -166,7 +166,7 @@ def test_review_worker_uses_fixed_page_size_for_pagination(monkeypatch) -> None:
         ),
     )
 
-    result = review_worker.run_one_review_job(attended_browser=False, min_delay=0, max_delay=0)
+    result = review_worker.run_one_review_job(attended_browser=True, min_delay=0, max_delay=0)
 
     assert result.status == JobStatus.COMPLETED
     assert ("build", 40, 100) in calls

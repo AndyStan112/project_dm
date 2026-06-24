@@ -480,16 +480,15 @@ def run_one_review_job(
                     )
 
                 payload = json.loads(response_body)
-                with write_session() as session, session.begin():
-                    reviews_seen, offset, checkpoint_status = (
-                        apply_review_payload(
-                            session,
-                            job_id=job_id,
-                            family_id=family_id,
-                            payload=payload,
-                            page_size=REVIEW_PAGE_SIZE,
-                        )
-                    )
+
+            with write_session() as session, session.begin():
+                reviews_seen, offset, checkpoint_status = apply_review_payload(
+                    session,
+                    job_id=job_id,
+                    family_id=family_id,
+                    payload=payload,
+                    page_size=REVIEW_PAGE_SIZE,
+                )
 
             pages_processed += 1
             reviews_upserted += reviews_seen
