@@ -4,6 +4,7 @@ import random
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import os
 
 from playwright.sync_api import (
     TimeoutError as PlaywrightTimeoutError,
@@ -15,6 +16,7 @@ from project_dm.repositories.jobs import (
     complete_product_job,
     fail_job,
     get_or_create_review_job,
+    set_job_status,
 )
 from project_dm.repositories.products import (
     upsert_product_family,
@@ -30,7 +32,7 @@ from project_dm.schemas import (
 )
 from project_dm.scraping.guards import visible_page_is_blocked
 from project_dm.scraping.product import parse_product_page
-from project_dm.workers.listing import open_browser, save_diagnostic
+from project_dm.workers.listing import current_status, open_browser, save_diagnostic
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,15 @@ class ProductRunResult:
     review_jobs_created: int
     status: JobStatus | None
     message: str
+
+
+def _attended_browser_mode() -> bool:
+    return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def run_product_jobs(
@@ -133,6 +144,22 @@ def run_product_jobs(
                     message = (
                         f"eMAG blocked product request (HTTP {http_status})."
                     )
+                    if not _attended_browser_mode():
+                        with write_session() as session, session.begin():
+                            fail_job(
+                                session,
+                                job_id=job_id,
+                                status=JobStatus.BLOCKED,
+                                message=message,
+                            )
+                        return ProductRunResult(
+                            jobs_processed=jobs_processed,
+                            variants_upserted=variants_upserted,
+                            review_jobs_created=review_jobs_created,
+                            status=JobStatus.BLOCKED,
+                            message=message,
+                        )
+
                     with write_session() as session, session.begin():
                         fail_job(
                             session,
@@ -140,13 +167,32 @@ def run_product_jobs(
                             status=JobStatus.BLOCKED,
                             message=message,
                         )
-                    return ProductRunResult(
-                        jobs_processed=jobs_processed,
-                        variants_upserted=variants_upserted,
-                        review_jobs_created=review_jobs_created,
-                        status=JobStatus.BLOCKED,
-                        message=message,
-                    )
+                        set_job_status(session, job_id, JobStatus.RUNNING)
+                        update_service_control_state(
+                            session,
+                            "scraper",
+                            current_state=JobStatus.RUNNING.value,
+                            current_job_id=job_id,
+                            message=(
+                                f"Awaiting manual CAPTCHA solve for product job #{job_id}."
+                            ),
+                        )
+                    page.bring_to_front()
+                    while True:
+                        if current_status(job_id) is not JobStatus.RUNNING:
+                            return ProductRunResult(
+                                jobs_processed=jobs_processed,
+                                variants_upserted=variants_upserted,
+                                review_jobs_created=review_jobs_created,
+                                status=JobStatus.PAUSED,
+                                message="Stopped while waiting for manual solve.",
+                            )
+                        page.wait_for_timeout(2_000)
+                        visible_text = page.locator("body").inner_text(
+                            timeout=5_000
+                        )
+                        if not visible_page_is_blocked(visible_text):
+                            break
 
                 product = parse_product_page(page.content(), page.url)
                 with write_session() as session, session.begin():
