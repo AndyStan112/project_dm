@@ -1192,9 +1192,12 @@ def _run_worker(
     attended_browser: bool = False,
 ) -> None:
     if worker == "listing":
-        run_one_listing_job(max_pages=max_pages)
+        run_one_listing_job(
+            max_pages=max_pages,
+            attended_browser=attended_browser,
+        )
     elif worker == "product":
-        run_product_jobs(max_jobs=1)
+        run_product_jobs(attended_browser=attended_browser)
     elif worker == "reviews":
         run_one_review_job(attended_browser=attended_browser)
 

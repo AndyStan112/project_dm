@@ -232,3 +232,31 @@ def test_job_can_be_marked_unrecoverable() -> None:
     client = TestClient(app)
     response = client.post("/jobs/1/unrecoverable", follow_redirects=False)
     assert response.status_code in {303, 404}
+
+
+def test_run_worker_passes_attended_browser_to_listing_and_product(monkeypatch) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    monkeypatch.setattr(
+        web_app,
+        "run_one_listing_job",
+        lambda **kwargs: calls.append(("listing", kwargs)),
+    )
+    monkeypatch.setattr(
+        web_app,
+        "run_product_jobs",
+        lambda **kwargs: calls.append(("product", kwargs)),
+    )
+    monkeypatch.setattr(
+        web_app,
+        "run_one_review_job",
+        lambda **kwargs: calls.append(("reviews", kwargs)),
+    )
+
+    web_app._run_worker("listing", max_pages=3, attended_browser=True)
+    web_app._run_worker("product", max_pages=3, attended_browser=True)
+
+    assert calls == [
+        ("listing", {"max_pages": 3, "attended_browser": True}),
+        ("product", {"attended_browser": True}),
+    ]

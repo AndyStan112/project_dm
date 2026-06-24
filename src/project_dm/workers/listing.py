@@ -72,11 +72,21 @@ def open_browser(
     return playwright, browser
 
 
+def _attended_browser_mode() -> bool:
+    return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def run_one_listing_job(
     *,
     max_pages: int | None = None,
     min_delay: float = 5.0,
     max_delay: float = 10.0,
+    attended_browser: bool | None = None,
 ) -> ListingRunResult:
     if min_delay < 0 or max_delay < min_delay:
         raise ValueError("Invalid delay range")
@@ -135,7 +145,9 @@ def run_one_listing_job(
     playwright = None
     browser = None
     try:
-        playwright, browser = open_browser()
+        if attended_browser is None:
+            attended_browser = _attended_browser_mode()
+        playwright, browser = open_browser(attended_browser=attended_browser)
         page = browser.new_page(
             locale="ro-RO",
             timezone_id="Europe/Bucharest",
@@ -167,6 +179,21 @@ def run_one_listing_job(
             ):
                 save_diagnostic(page, job_id, f"blocked_page_{pages_processed}")
                 message = f"eMAG blocked listing request (HTTP {http_status})."
+                if not _attended_browser_mode():
+                    with write_session() as session, session.begin():
+                        fail_job(
+                            session,
+                            job_id=job_id,
+                            status=JobStatus.BLOCKED,
+                            message=message,
+                        )
+                    return ListingRunResult(
+                        job_id=job_id,
+                        pages_processed=pages_processed,
+                        product_jobs_created=product_jobs_created,
+                        status=JobStatus.BLOCKED,
+                        message=message,
+                    )
                 with write_session() as session, session.begin():
                     fail_job(
                         session,
@@ -174,13 +201,32 @@ def run_one_listing_job(
                         status=JobStatus.BLOCKED,
                         message=message,
                     )
-                return ListingRunResult(
-                    job_id=job_id,
-                    pages_processed=pages_processed,
-                    product_jobs_created=product_jobs_created,
-                    status=JobStatus.BLOCKED,
-                    message=message,
-                )
+                    set_job_status(session, job_id, JobStatus.RUNNING)
+                    update_service_control_state(
+                        session,
+                        "scraper",
+                        current_state=JobStatus.RUNNING.value,
+                        current_job_id=job_id,
+                        message=(
+                            f"Awaiting manual CAPTCHA solve for listing job #{job_id}."
+                        ),
+                    )
+                page.bring_to_front()
+                while True:
+                    if current_status(job_id) is not JobStatus.RUNNING:
+                        return ListingRunResult(
+                            job_id=job_id,
+                            pages_processed=pages_processed,
+                            product_jobs_created=product_jobs_created,
+                            status=JobStatus.PAUSED,
+                            message="Stopped while waiting for manual solve.",
+                        )
+                    page.wait_for_timeout(2_000)
+                    visible_text = page.locator("body").inner_text(
+                        timeout=5_000
+                    )
+                    if not visible_page_is_blocked(visible_text):
+                        break
 
             listing = parse_listing_page(page.content(), page.url)
             if not listing.products:

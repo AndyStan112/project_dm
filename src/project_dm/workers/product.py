@@ -58,6 +58,7 @@ def run_product_jobs(
     max_jobs: int = 1,
     min_delay: float = 5.0,
     max_delay: float = 10.0,
+    attended_browser: bool | None = None,
 ) -> ProductRunResult:
     if max_jobs < 1:
         raise ValueError("max_jobs must be positive")
@@ -71,7 +72,9 @@ def run_product_jobs(
     browser = None
 
     try:
-        playwright, browser = open_browser()
+        if attended_browser is None:
+            attended_browser = _attended_browser_mode()
+        playwright, browser = open_browser(attended_browser=attended_browser)
         page = browser.new_page(
             locale="ro-RO",
             timezone_id="Europe/Bucharest",
