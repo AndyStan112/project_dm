@@ -29,6 +29,8 @@ def test_dashboard_pages_render() -> None:
         response = client.get(path)
         assert response.status_code == 200
         assert "Project DM" in response.text
+    assert "NLP coverage" in client.get("/").text
+    assert "NLP coverage" in client.get("/workers").text
 
 
 def test_dashboard_filters_and_product_detail_render() -> None:

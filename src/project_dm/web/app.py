@@ -549,6 +549,7 @@ def workers(
     queued_reviews: int | None = None,
 ) -> HTMLResponse:
     with read_session() as session:
+        stats = dashboard_stats(session)
         existing = {
             control.service_name: control
             for control in list_service_controls(session)
@@ -589,6 +590,7 @@ def workers(
                 row["last_heartbeat_at"] is not None for row in rows
             ),
             queued_reviews=queued_reviews,
+            stats=stats,
         ),
     )
 

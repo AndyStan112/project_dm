@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import Select, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from project_dm.models import Brand, Job, ProductFamily, Review, Variant
+from project_dm.models import Brand, Job, NlpResult, ProductFamily, Review, Variant
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,9 @@ class DashboardStats:
     families: int
     variants: int
     reviews: int
+    nlp_rows: int
+    nlp_coverage_percent: float
+    nlp_missing_reviews: int
     verified_reviews: int
     helpful_reviews: int
     pending_jobs: int
@@ -21,6 +24,11 @@ class DashboardStats:
 
 
 def dashboard_stats(session: Session) -> DashboardStats:
+    reviews = session.scalar(select(func.count()).select_from(Review)) or 0
+    nlp_rows = session.scalar(
+        select(func.count()).select_from(NlpResult)
+    ) or 0
+    coverage_percent = round((nlp_rows / reviews) * 100, 2) if reviews else 0.0
     return DashboardStats(
         brands=session.scalar(select(func.count()).select_from(Brand)) or 0,
         families=session.scalar(
@@ -29,7 +37,10 @@ def dashboard_stats(session: Session) -> DashboardStats:
         or 0,
         variants=session.scalar(select(func.count()).select_from(Variant))
         or 0,
-        reviews=session.scalar(select(func.count()).select_from(Review)) or 0,
+        reviews=reviews,
+        nlp_rows=nlp_rows,
+        nlp_coverage_percent=coverage_percent,
+        nlp_missing_reviews=max(reviews - nlp_rows, 0),
         verified_reviews=session.scalar(
             select(func.count())
             .select_from(Review)

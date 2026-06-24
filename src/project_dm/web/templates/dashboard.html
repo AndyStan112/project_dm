@@ -20,6 +20,11 @@
     <small id="metric-reviews-detail">{{ stats.verified_reviews }} verified · {{ stats.helpful_reviews }} with votes</small>
   </article>
   <article class="metric">
+    <span>NLP coverage</span>
+    <strong id="metric-nlp-coverage">{{ "{:.2f}".format(stats.nlp_coverage_percent) }}%</strong>
+    <small id="metric-nlp-detail">{{ stats.nlp_rows }} processed · {{ stats.nlp_missing_reviews }} missing</small>
+  </article>
+  <article class="metric">
     <span>Product families</span>
     <strong id="metric-families">{{ stats.families }}</strong>
     <small id="metric-families-detail">{{ stats.variants }} known variants</small>
@@ -208,6 +213,8 @@
   const metrics = {
     reviews: document.getElementById("metric-reviews"),
     reviewsDetail: document.getElementById("metric-reviews-detail"),
+    nlpCoverage: document.getElementById("metric-nlp-coverage"),
+    nlpDetail: document.getElementById("metric-nlp-detail"),
     families: document.getElementById("metric-families"),
     familiesDetail: document.getElementById("metric-families-detail"),
     queue: document.getElementById("metric-queue"),
@@ -353,6 +360,12 @@
       const data = await response.json();
       metrics.reviews.textContent = formatInt(data.stats.reviews);
       metrics.reviewsDetail.textContent = `${formatInt(data.stats.verified_reviews)} verified · ${formatInt(data.stats.helpful_reviews)} with votes`;
+      if (metrics.nlpCoverage) {
+        metrics.nlpCoverage.textContent = `${Number(data.stats.nlp_coverage_percent).toFixed(2)}%`;
+      }
+      if (metrics.nlpDetail) {
+        metrics.nlpDetail.textContent = `${formatInt(data.stats.nlp_rows)} processed · ${formatInt(data.stats.nlp_missing_reviews)} missing`;
+      }
       metrics.families.textContent = formatInt(data.stats.families);
       metrics.familiesDetail.textContent = `${formatInt(data.stats.variants)} known variants`;
       metrics.queue.textContent = formatInt(data.stats.pending_jobs);

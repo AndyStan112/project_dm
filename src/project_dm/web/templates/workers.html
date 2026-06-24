@@ -22,6 +22,7 @@
   {% if queued_reviews is not none %}
   <p class="hint">Queued or resumed {{ queued_reviews }} review jobs for families that still have reviews left to collect.</p>
   {% endif %}
+  <p class="hint">NLP coverage: {{ "{:.2f}".format(stats.nlp_coverage_percent) }}% of reviews processed ({{ stats.nlp_rows }} rows, {{ stats.nlp_missing_reviews }} still missing).</p>
 </section>
 
 {% if blocked_jobs %}
