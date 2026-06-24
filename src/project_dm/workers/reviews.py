@@ -12,7 +12,6 @@ from pathlib import Path
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from project_dm.db import write_session
-from project_dm.models import ProductFamily
 from project_dm.repositories.jobs import (
     checkpoint_review_page,
     claim_pending_job,
@@ -25,6 +24,9 @@ from project_dm.schemas import JobStatus, JobType, ReviewCreate
 from project_dm.scraping.guards import visible_page_is_blocked
 from project_dm.scraping.reviews import build_reviews_url, parse_review_page
 from project_dm.workers.listing import current_status, open_browser, save_diagnostic
+
+
+REVIEW_PAGE_SIZE = 100
 
 
 @dataclass(frozen=True)
@@ -245,17 +247,11 @@ def run_one_review_job(
             message=message,
         )
 
-    with write_session() as session:
-        family = session.get(ProductFamily, family_id)
-        if family is not None and family.review_count:
-            effective_page_size = int(family.review_count)
-        elif job.total_expected:
-            effective_page_size = int(job.total_expected)
-        else:
-            effective_page_size = 1_000
+    # Keep the worker aligned with the manual import flow: eMAG review pages are
+    # fetched in fixed-size batches, not as one oversized request.
     print(
-        "[reviews] full fetch page_size "
-        f"job_id={job_id} effective_page_size={effective_page_size}",
+        "[reviews] review pagination "
+        f"job_id={job_id} page_size={REVIEW_PAGE_SIZE}",
         file=sys.stderr,
         flush=True,
     )
@@ -322,7 +318,7 @@ def run_one_review_job(
                 )
 
             reviews_url = build_reviews_url(
-                target_url, offset=offset, limit=effective_page_size
+                target_url, offset=offset, limit=REVIEW_PAGE_SIZE
             )
             if _attended_browser_mode():
                 response = page.goto(
@@ -484,16 +480,16 @@ def run_one_review_job(
                     )
 
                 payload = json.loads(response_body)
-            with write_session() as session, session.begin():
-                reviews_seen, offset, checkpoint_status = (
-                    apply_review_payload(
-                        session,
-                        job_id=job_id,
-                        family_id=family_id,
-                        payload=payload,
-                        page_size=effective_page_size,
+                with write_session() as session, session.begin():
+                    reviews_seen, offset, checkpoint_status = (
+                        apply_review_payload(
+                            session,
+                            job_id=job_id,
+                            family_id=family_id,
+                            payload=payload,
+                            page_size=REVIEW_PAGE_SIZE,
+                        )
                     )
-                )
 
             pages_processed += 1
             reviews_upserted += reviews_seen
