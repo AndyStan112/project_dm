@@ -235,6 +235,45 @@ def run_one_listing_job(
             if not listing.products:
                 save_diagnostic(page, job_id, f"empty_page_{pages_processed}")
                 message = "Listing page contained no product cards."
+                if _attended_browser_mode():
+                    with write_session() as session, session.begin():
+                        fail_job(
+                            session,
+                            job_id=job_id,
+                            status=JobStatus.BLOCKED,
+                            message=message,
+                        )
+                        set_job_status(session, job_id, JobStatus.RUNNING)
+                        update_service_control_state(
+                            session,
+                            "scraper",
+                            current_state=JobStatus.RUNNING.value,
+                            current_job_id=job_id,
+                            message=(
+                                f"Awaiting manual CAPTCHA solve for listing job #{job_id}."
+                            ),
+                        )
+                    page.bring_to_front()
+                    while True:
+                        if current_status(job_id) is not JobStatus.RUNNING:
+                            return ListingRunResult(
+                                job_id=job_id,
+                                pages_processed=pages_processed,
+                                product_jobs_created=product_jobs_created,
+                                status=JobStatus.PAUSED,
+                                message="Stopped while waiting for manual solve.",
+                            )
+                        page.wait_for_timeout(2_000)
+                        visible_text = page.locator("body").inner_text(
+                            timeout=5_000
+                        )
+                        if visible_page_is_blocked(visible_text):
+                            continue
+                        listing = parse_listing_page(page.content(), page.url)
+                        if listing.products:
+                            break
+                    if not listing.products:
+                        continue
                 with write_session() as session, session.begin():
                     fail_job(
                         session,
