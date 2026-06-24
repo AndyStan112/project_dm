@@ -215,6 +215,8 @@ def _job_progress_url(job: Job, session) -> str | None:
 def _job_next_review_url(job: Job) -> str | None:
     if job.target_url is None:
         return None
+    if job.job_type != JobType.REVIEWS.value:
+        return None
     if (
         job.status == JobStatus.COMPLETED.value
         or (

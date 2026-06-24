@@ -147,6 +147,19 @@ def test_captcha_review_job_exposes_next_page_url(monkeypatch) -> None:
     assert "page%5Boffset%5D=200" in response.context["next_open_url"]
 
 
+def test_brand_jobs_do_not_expose_review_next_page_url() -> None:
+    class FakeJob:
+        def __init__(self) -> None:
+            self.id = 414
+            self.job_type = "brand_listing"
+            self.status = "running"
+            self.current_offset = 0
+            self.total_expected = None
+            self.target_url = "https://www.emag.ro/telefoane-mobile/brand/samsung/c"
+
+    assert web_app._job_next_review_url(FakeJob()) is None
+
+
 def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> None:
     class FakeJob:
         def __init__(self) -> None:
