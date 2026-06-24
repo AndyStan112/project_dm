@@ -880,6 +880,44 @@ def captcha_product_unrecoverable(job_id: int) -> RedirectResponse:
     return RedirectResponse("/captcha/product?marked=1", status_code=303)
 
 
+@app.get("/captcha/product/{job_id}/browser")
+def solve_captcha_product_in_browser(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.PRODUCT.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        scraper_control = next(
+            (
+                control
+                for control in list_service_controls(session)
+                if control.service_name == "scraper"
+            ),
+            None,
+        )
+        should_requeue = (
+            job.status
+            in {
+                JobStatus.FAILED.value,
+                JobStatus.BLOCKED.value,
+                JobStatus.PAUSED.value,
+            }
+            or scraper_control is None
+            or scraper_control.current_job_id != job.id
+        )
+        if should_requeue:
+            set_job_status(session, job_id, JobStatus.PENDING)
+        job = session.get(Job, job_id)
+        if job is not None and job.last_error:
+            job.last_error = None
+            session.flush()
+    return RedirectResponse("/browser", status_code=303)
+
+
 @app.get("/captcha/review", response_class=HTMLResponse)
 def captcha_review(
     request: Request,
@@ -986,6 +1024,44 @@ def solve_captcha_review_in_browser(job_id: int) -> RedirectResponse:
         )
         should_requeue = (
             job.status in {
+                JobStatus.FAILED.value,
+                JobStatus.BLOCKED.value,
+                JobStatus.PAUSED.value,
+            }
+            or scraper_control is None
+            or scraper_control.current_job_id != job.id
+        )
+        if should_requeue:
+            set_job_status(session, job_id, JobStatus.PENDING)
+            job = session.get(Job, job_id)
+        if job is not None and job.last_error:
+            job.last_error = None
+            session.flush()
+    return RedirectResponse("/browser", status_code=303)
+
+
+@app.get("/captcha/brand/{job_id}/browser")
+def solve_captcha_brand_in_browser(job_id: int) -> RedirectResponse:
+    with write_session() as session, session.begin():
+        job = session.get(Job, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if job.job_type != JobType.BRAND_LISTING.value:
+            raise HTTPException(
+                status_code=400,
+                detail="Job type does not match captcha page",
+            )
+        scraper_control = next(
+            (
+                control
+                for control in list_service_controls(session)
+                if control.service_name == "scraper"
+            ),
+            None,
+        )
+        should_requeue = (
+            job.status
+            in {
                 JobStatus.FAILED.value,
                 JobStatus.BLOCKED.value,
                 JobStatus.PAUSED.value,

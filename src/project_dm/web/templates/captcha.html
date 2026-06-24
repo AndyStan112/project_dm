@@ -71,11 +71,13 @@
       <h2>#{{ job.id }} {{ job.job_type }}</h2>
       <p class="hint">{{ job_row.brand_slug or job_row.family_name or "Unassigned" }}</p>
       <p class="hint">{{ job.target_url or "No target URL" }}</p>
+      <p class="hint">Attempts: {{ job.attempts }} · Status: {{ job.status }}</p>
     </div>
     <div class="captcha-actions">
       {% if open_url %}
       <a class="button" href="{{ open_url }}">Open target</a>
       {% endif %}
+      <a class="button secondary" href="/captcha/brand/{{ job.id }}/browser">Solve in server browser (VNC)</a>
       {% if job_row %}
       <form method="post" action="/captcha/brand/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
@@ -112,6 +114,7 @@
       {% if open_url %}
       <a class="button" href="{{ open_url }}">Open target</a>
       {% endif %}
+      <a class="button secondary" href="/captcha/product/{{ job.id }}/browser">Solve in server browser (VNC)</a>
       <form method="post" action="/captcha/product/{{ job.id }}/unrecoverable">
         <button class="button danger-button" type="submit">Mark unrecoverable</button>
       </form>

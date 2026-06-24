@@ -160,6 +160,110 @@ def test_brand_jobs_do_not_expose_review_next_page_url() -> None:
     assert web_app._job_next_review_url(FakeJob()) is None
 
 
+def test_solve_captcha_brand_in_browser_redirects_to_browser(monkeypatch) -> None:
+    class FakeJob:
+        def __init__(self) -> None:
+            self.id = 415
+            self.job_type = "brand_listing"
+            self.status = "blocked"
+            self.last_error = "Brand listing blocked."
+
+    class FakeControl:
+        service_name = "scraper"
+        current_job_id = None
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.job = FakeJob()
+
+        def get(self, model, job_id, with_for_update=False):  # noqa: ANN001
+            return self.job if job_id == self.job.id else None
+
+        def begin(self):
+            return nullcontext()
+
+        def flush(self) -> None:
+            pass
+
+    fake_session = FakeSession()
+    calls: list[tuple[int, str]] = []
+
+    @contextmanager
+    def fake_write_session():
+        yield fake_session
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(
+        web_app,
+        "list_service_controls",
+        lambda session: [FakeControl()],
+    )
+    monkeypatch.setattr(
+        web_app,
+        "set_job_status",
+        lambda session, job_id, status: calls.append((job_id, status.value)),
+    )
+
+    response = web_app.solve_captcha_brand_in_browser(415)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/browser"
+    assert fake_session.job.last_error is None
+    assert calls == [(415, "pending")]
+
+
+def test_solve_captcha_product_in_browser_redirects_to_browser(monkeypatch) -> None:
+    class FakeJob:
+        def __init__(self) -> None:
+            self.id = 416
+            self.job_type = "product"
+            self.status = "blocked"
+            self.last_error = "Product page blocked."
+
+    class FakeControl:
+        service_name = "scraper"
+        current_job_id = None
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.job = FakeJob()
+
+        def get(self, model, job_id, with_for_update=False):  # noqa: ANN001
+            return self.job if job_id == self.job.id else None
+
+        def begin(self):
+            return nullcontext()
+
+        def flush(self) -> None:
+            pass
+
+    fake_session = FakeSession()
+    calls: list[tuple[int, str]] = []
+
+    @contextmanager
+    def fake_write_session():
+        yield fake_session
+
+    monkeypatch.setattr(web_app, "write_session", fake_write_session)
+    monkeypatch.setattr(
+        web_app,
+        "list_service_controls",
+        lambda session: [FakeControl()],
+    )
+    monkeypatch.setattr(
+        web_app,
+        "set_job_status",
+        lambda session, job_id, status: calls.append((job_id, status.value)),
+    )
+
+    response = web_app.solve_captcha_product_in_browser(416)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/browser"
+    assert fake_session.job.last_error is None
+    assert calls == [(416, "pending")]
+
+
 def test_solve_captcha_review_in_browser_redirects_to_browser(monkeypatch) -> None:
     class FakeJob:
         def __init__(self) -> None:
