@@ -73,12 +73,15 @@ def open_browser(
 
 
 def _attended_browser_mode() -> bool:
-    return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+    return (
+        os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
         "1",
         "true",
         "yes",
         "on",
-    }
+        }
+        or bool(os.getenv("PROJECT_DM_BROWSER_PUBLIC_URL"))
+    )
 
 
 def run_one_listing_job(

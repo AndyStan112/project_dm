@@ -95,12 +95,15 @@ def _status_needs_manual_solve(status: int | None) -> bool:
 
 
 def _attended_browser_mode() -> bool:
-    return os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
+    return (
+        os.getenv("PROJECT_DM_ATTENDED_BROWSER", "").lower() in {
         "1",
         "true",
         "yes",
         "on",
-    }
+        }
+        or bool(os.getenv("PROJECT_DM_BROWSER_PUBLIC_URL"))
+    )
 
 
 def apply_review_payload(
