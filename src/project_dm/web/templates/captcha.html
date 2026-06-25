@@ -37,7 +37,7 @@
     <span class="panel-tag">{{ "active" if job_row else "idle" }}</span>
   </div>
   {% if marked %}
-  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--green);">
+  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--accent);">
     Brand job marked unrecoverable. Loading the next brand.
   </div>
   {% endif %}
@@ -78,7 +78,7 @@
     <a class="text-link" href="/captcha/product">Refresh</a>
   </div>
   {% if marked %}
-  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--green);">
+  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--accent);">
     Product job marked unrecoverable. Loading the next product.
   </div>
   {% endif %}
@@ -114,12 +114,12 @@
   </div>
   {% if job_row %}
   {% if stale %}
-  <div class="empty-state" style="border-style: solid; border-color: #f1d1c3; background: #fff7f2; color: var(--red);">
+  <div class="empty-state" style="border-style: solid; border-color: #f1d1c3; background: #fff7f2; color: var(--danger);">
     This review URL returned 404 or 410 and was marked unrecoverable.
   </div>
   {% endif %}
   {% if marked %}
-  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--green);">
+  <div class="empty-state" style="border-style: solid; border-color: #c7d2fe; background: #eef2ff; color: var(--accent);">
     Review job marked unrecoverable. Loading the next review.
   </div>
   {% endif %}
