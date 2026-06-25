@@ -16,7 +16,7 @@ def test_pwa_assets_are_served() -> None:
     assert manifest_response.media_type == "application/manifest+json"
     assert manifest_response.body.decode("utf-8").startswith("{")
     assert '"start_url": "/"' in manifest_response.body.decode("utf-8")
-    assert '"/static/icon-192.png"' in manifest_response.body.decode("utf-8")
+    assert '"/static/logo.png"' in manifest_response.body.decode("utf-8")
 
     sw_response = service_worker()
     assert sw_response.status_code == 200

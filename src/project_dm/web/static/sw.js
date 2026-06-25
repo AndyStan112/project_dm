@@ -1,12 +1,10 @@
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open("project-dm-shell-v1").then((cache) =>
+    caches.open("project-dm-shell-v2").then((cache) =>
       cache.addAll([
         "/",
         "/static/manifest.webmanifest",
-        "/static/icon-192.png",
-        "/static/icon-512.png",
-        "/static/apple-touch-icon.png",
+        "/static/logo.png",
       ]),
     ),
   );
@@ -14,7 +12,15 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith("project-dm-shell-") && key !== "project-dm-shell-v2")
+          .map((key) => caches.delete(key)),
+      ),
+    ).then(() => self.clients.claim()),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -24,7 +30,7 @@ self.addEventListener("fetch", (event) => {
   }
   event.respondWith(
     fetch(request).catch(async () => {
-      const cache = await caches.open("project-dm-shell-v1");
+      const cache = await caches.open("project-dm-shell-v2");
       const cached = await cache.match("/");
       return cached || Response.error();
     }),
@@ -38,8 +44,8 @@ self.addEventListener("message", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Project DM", {
       body: data.options && data.options.body ? data.options.body : "",
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/static/logo.png",
+      badge: "/static/logo.png",
       data: data.options && data.options.data ? data.options.data : {},
       tag: data.options && data.options.tag ? data.options.tag : undefined,
     }),
@@ -53,8 +59,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: options.body || payload.body || "",
-      icon: options.icon || "/icon.svg",
-      badge: options.badge || "/icon.svg",
+      icon: options.icon || "/static/logo.png",
+      badge: options.badge || "/static/logo.png",
       data: options.data || {},
       tag: options.tag,
     }),

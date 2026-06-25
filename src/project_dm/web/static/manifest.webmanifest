@@ -1,31 +1,19 @@
 {
   "id": "/",
-  "name": "Project DM",
-  "short_name": "Project DM",
+  "name": "DataMag",
+  "short_name": "DataMag",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone"],
-  "background_color": "#f4f5f1",
-  "theme_color": "#14251e",
+  "background_color": "#f6f7fc",
+  "theme_color": "#15142f",
   "description": "Dashboard for eMAG review collection and mobile CAPTCHA solving.",
   "icons": [
     {
-      "src": "/static/icon-192.png",
-      "sizes": "192x192",
+      "src": "/static/logo.png",
+      "sizes": "2000x2000",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/static/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/static/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
