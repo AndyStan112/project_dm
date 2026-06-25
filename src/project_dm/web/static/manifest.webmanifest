@@ -11,7 +11,7 @@
   "description": "Dashboard for eMAG review collection and mobile CAPTCHA solving.",
   "icons": [
     {
-      "src": "/static/logo.png",
+      "src": "/static/logo-icon.png",
       "sizes": "2000x2000",
       "type": "image/png",
       "purpose": "any maskable"

@@ -4,7 +4,7 @@ self.addEventListener("install", (event) => {
       cache.addAll([
         "/",
         "/static/manifest.webmanifest",
-        "/static/logo.png",
+        "/static/logo-icon.png",
       ]),
     ),
   );
@@ -44,8 +44,8 @@ self.addEventListener("message", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "Project DM", {
       body: data.options && data.options.body ? data.options.body : "",
-      icon: "/static/logo.png",
-      badge: "/static/logo.png",
+      icon: "/static/logo-icon.png",
+      badge: "/static/logo-icon.png",
       data: data.options && data.options.data ? data.options.data : {},
       tag: data.options && data.options.tag ? data.options.tag : undefined,
     }),
@@ -59,8 +59,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: options.body || payload.body || "",
-      icon: options.icon || "/static/logo.png",
-      badge: options.badge || "/static/logo.png",
+      icon: options.icon || "/static/logo-icon.png",
+      badge: options.badge || "/static/logo-icon.png",
       data: options.data || {},
       tag: options.tag,
     }),

@@ -454,22 +454,22 @@ def app_icon() -> Response:
 
 @app.get("/icon-192.png", include_in_schema=False)
 def app_icon_192() -> Response:
-    return _static_binary_response("logo.png", "image/png")
+    return _static_binary_response("logo-icon.png", "image/png")
 
 
 @app.get("/icon-512.png", include_in_schema=False)
 def app_icon_512() -> Response:
-    return _static_binary_response("logo.png", "image/png")
+    return _static_binary_response("logo-icon.png", "image/png")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon() -> Response:
-    return _static_binary_response("logo.png", "image/png")
+    return _static_binary_response("logo-icon.png", "image/png")
 
 
 @app.get("/apple-touch-icon.png", include_in_schema=False)
 def apple_touch_icon() -> Response:
-    return _static_binary_response("logo.png", "image/png")
+    return _static_binary_response("logo-icon.png", "image/png")
 
 
 @app.get("/pwa-debug", response_class=HTMLResponse)
@@ -485,9 +485,9 @@ def pwa_debug(request: Request) -> HTMLResponse:
             worker_status=worker_status,
             manifest_url="/static/manifest.webmanifest",
             sw_url="/sw.js",
-            icon_192_url="/static/logo.png",
-            icon_512_url="/static/logo.png",
-            touch_icon_url="/static/logo.png",
+            icon_192_url="/static/logo-icon.png",
+            icon_512_url="/static/logo-icon.png",
+            touch_icon_url="/static/logo-icon.png",
         ),
     )
 

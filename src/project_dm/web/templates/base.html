@@ -7,17 +7,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>{% block title %}Project DM{% endblock %}</title>
-  <link rel="icon" href="/static/logo.png" type="image/png">
+  <link rel="icon" href="/static/logo-icon.png" type="image/png">
   <link rel="stylesheet" href="{{ url_for('static', path='/app.css') }}">
   <link rel="manifest" href="/static/manifest.webmanifest">
-  <link rel="apple-touch-icon" href="/static/logo.png">
+  <link rel="apple-touch-icon" href="/static/logo-icon.png">
   {% block head %}{% endblock %}
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand-mark" href="/">
-        <img class="brand-logo" src="/static/logo.png" alt="DataMag logo">
+        <img class="brand-logo" src="/static/logo-light.png" alt="DataMag logo">
       </a>
       <nav>
         <a class="{{ 'active' if active == 'dashboard' else '' }}" href="/">
