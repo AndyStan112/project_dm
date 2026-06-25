@@ -7,22 +7,6 @@
   <a class="button secondary" href="/workers">Workers</a>
 {% endblock %}
 {% block content %}
-<section class="panel notice-panel">
-  <div class="panel-heading">
-    <div>
-      <p class="eyebrow">Workflow</p>
-      <h2>Pick a lane and move one item at a time</h2>
-    </div>
-    <span class="panel-tag">{{ title }}</span>
-  </div>
-  <div class="captcha-tabs">
-    <a class="captcha-tab {{ 'active' if kind == 'brand' else '' }}" href="/captcha/brand">Brand <small>{{ counts.brand if counts is defined else '' }}</small></a>
-    <a class="captcha-tab {{ 'active' if kind == 'product' else '' }}" href="/captcha/product">Product <small>{{ counts.product if counts is defined else '' }}</small></a>
-    <a class="captcha-tab {{ 'active' if kind == 'review' else '' }}" href="/captcha/review">Review <small>{{ counts.review if counts is defined else '' }}</small></a>
-  </div>
-  <p class="hint">This page always shows the exact job we want you to handle next. The open link points at the correct target for that job, so there is no guessing or mismatch between cards and browser tabs.</p>
-</section>
-
 {% if not kind %}
 <section class="two-column">
   <article class="panel">
