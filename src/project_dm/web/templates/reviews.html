@@ -25,7 +25,7 @@
     <div class="bar-chart">{% for score, count in rating_counts %}<a class="bar-row" href="/reviews?rating={{ score }}"><span>{{ score }} stars</span><div class="bar-track"><i style="width: {{ (count / maximum * 100) if maximum else 0 }}%"></i></div><strong>{{ count }}</strong></a>{% endfor %}</div>
   </article>
   <article>
-    <div class="results-heading"><strong>{{ reviews|length }} results shown</strong><small>Newest first, capped at 100</small></div>
+    <div class="results-heading"><strong>{{ reviews|length }} results shown</strong></div>
     <div class="review-list">{% for row in reviews %}{% include "_review_card.html" %}{% else %}<div class="empty-state">No reviews match this query.</div>{% endfor %}</div>
   </article>
 </section>
