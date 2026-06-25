@@ -7,24 +7,6 @@
   <a class="button secondary" href="/captcha">Open captcha</a>
 {% endblock %}
 {% block content %}
-<section class="panel notice-panel">
-  <div class="panel-heading">
-    <div><p class="eyebrow">Important</p><h2>What this page can and cannot do</h2></div>
-    <span class="panel-tag">{{ "daemon online" if worker_daemon_online else "no daemon" }}</span>
-  </div>
-  <p class="hint">
-    This dashboard stores <strong>desired state</strong> for worker services.
-    The web app now runs a supervisor loop in-process, and the scraper service
-    uses {{ scraper_lane_count }} parallel lanes, so the table should move from
-    <code>stopped</code> and <code>never</code> to live heartbeat updates after
-    startup.
-  </p>
-  {% if queued_reviews is not none %}
-  <p class="hint">Queued or resumed {{ queued_reviews }} review jobs for families that still have reviews left to collect.</p>
-  {% endif %}
-  <p class="hint">NLP coverage: {{ "{:.2f}".format(stats.nlp_coverage_percent) }}% of reviews processed ({{ stats.nlp_rows }} rows, {{ stats.nlp_missing_reviews }} still missing).</p>
-</section>
-
 {% if blocked_jobs %}
 <section class="panel notice-panel">
   <div class="panel-heading">
